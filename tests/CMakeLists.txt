@@ -5,8 +5,12 @@ add_executable ( sparse_vector
   sparse_vector.cpp
 )
 
+add_executable ( type_enumerator
+  type_enumerator.cpp
+)
+
 list ( APPEND tests
-  sparse_vector
+  sparse_vector type_enumerator
 )
 
 include ( FetchContent )
