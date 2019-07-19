@@ -9,8 +9,12 @@ add_executable ( type_enumerator
   type_enumerator.cpp
 )
 
+add_executable ( storage
+  storage.cpp
+)
+
 list ( APPEND tests
-  sparse_vector type_enumerator
+  sparse_vector type_enumerator storage
 )
 
 include ( FetchContent )
