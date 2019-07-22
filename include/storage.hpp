@@ -81,9 +81,35 @@ void components_storage::join_impl( const eid_t id, Ft&& f, Rs&&... rs ) {
 
 template < typename... Ts, typename Ft >
 void components_storage::join( Ft&& f ) {
-  for ( std::size_t i = 0; i < 1024; ++i ) {
+  eid_t min_index( std::numeric_limits< eid_t >::max() ), max_index( 0 );
+  get_index_range< Ts... >( min_index, max_index );
+
+  for ( eid_t i = min_index; i < max_index; ++i ) {
     join_impl< Ts... >( i, std::forward< Ft >( f ) );
   }
+}
+
+template < class T >
+void components_storage::get_index_range( eid_t& min_index, eid_t& max_index ) {
+  const auto storage = get_storage< T >();
+  if ( storage ) {
+    const auto range = storage->index_range();
+    min_index = min_index > range.first ? range.first : min_index;
+    max_index = max_index < range.second ? range.second : max_index;
+  }
+}
+
+template < class T, class... Rs,
+  class = typename std::enable_if< sizeof...( Rs ) != 0 >::type >
+void components_storage::get_index_range( eid_t& min_index, eid_t& max_index ) {
+  const auto storage = get_storage< T >();
+  if ( storage ) {
+    const auto range = storage->index_range();
+    min_index = min_index > range.first ? range.first : min_index;
+    max_index = max_index < range.second ? range.second : max_index;
+  }
+
+  get_index_range< Rs... >( min_index, max_index );
 }
 
 components_storage::~components_storage() {

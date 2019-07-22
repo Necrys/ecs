@@ -6,6 +6,10 @@ struct Position {
   Position() {}
   Position( const float _x, const float _y ):
     x( _x ), y( _y ) {}
+
+  bool operator== ( const Position& other ) const {
+    return x == other.x && y == other.y;
+  }
 };
 
 struct Velocity {
@@ -14,4 +18,8 @@ struct Velocity {
   Velocity() {}
   Velocity( const float _x, const float _y ):
     x( _x ), y( _y ) {}
+
+  bool operator== ( const Velocity& other ) const {
+    return x == other.x && y == other.y;
+  }
 };

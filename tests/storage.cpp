@@ -76,4 +76,106 @@ SECTION( "remove_all" ) {
   REQUIRE( vc == nullptr );
 }
 
+SECTION( "remove" ) {
+  ecs::components_storage s;
+  s.add_entity_component< Position >( 200, 3.1415f, 2.7182f );
+
+  s.remove_entity_component< Position >( 200 );
+
+  const auto pc = s.get_entity_component< Position >( 200 );
+  bool called = false;
+  s.join< Position >( [ & ]( const ecs::eid_t, const Position& ) {
+    called = true;
+  } );
+
+  REQUIRE( called == false );
+  REQUIRE( pc == nullptr );
+}
+
+SECTION( "remove_noexist" ) {
+  ecs::components_storage s;
+  s.add_entity_component< Position >( 201, 3.1415f, 2.7182f );
+
+  s.remove_entity_component< Position >( 200 );
+
+  const auto pc = s.get_entity_component< Position >( 200 );
+
+  REQUIRE( pc == nullptr );
+}
+
+}
+
+TEST_CASE( "access" ) {
+
+SECTION( "get" ) {
+  ecs::components_storage s;
+  const auto& ref = s.add_entity_component< Position >( 200, 3.1415f, 2.7182f );
+  
+  auto pc = s.get_entity_component< Position >( 200 );
+  REQUIRE( *pc == ref );
+}
+
+SECTION( "get_const" ) {
+  ecs::components_storage s;
+  const auto& ref = s.add_entity_component< Position >( 200, 3.1415f, 2.7182f );
+  
+  const auto pc = s.get_entity_component< Position >( 200 );
+  REQUIRE( *pc == ref );
+}
+
+SECTION( "get_not_exist" ) {
+  ecs::components_storage s;
+  s.add_entity_component< Position >( 201, 3.1415f, 2.7182f );
+  
+  auto pc = s.get_entity_component< Position >( 200 );
+  REQUIRE( pc == nullptr );
+}
+
+SECTION( "get_not_exist_const" ) {
+  ecs::components_storage s;
+  s.add_entity_component< Position >( 201, 3.1415f, 2.7182f );
+
+  const auto pc = s.get_entity_component< Position >( 200 );
+  REQUIRE( pc == nullptr );
+}
+
+SECTION( "get_not_exist_2" ) {
+  ecs::components_storage s;
+
+  auto pc = s.get_entity_component< Position >( 200 );
+  REQUIRE( pc == nullptr );
+}
+
+SECTION( "join" ) {
+  ecs::components_storage s;
+  s.add_entity_component< Position >( 200, 3.1415f, 2.7182f );
+  const auto& pref = s.add_entity_component< Position >( 201, 1.0f, 2.0f );
+  const auto& vref = s.add_entity_component< Velocity >( 201, 1.4142f, 9.81f );
+  s.add_entity_component< Velocity >( 202, 20.0f, 3.0f );
+
+  size_t called = 0;
+  s.join< Position, Velocity >( [ & ]( const ecs::eid_t id, const Position& p, const Velocity& v ) {
+    ++called;
+    REQUIRE( id == 201 );
+    REQUIRE( p == pref );
+    REQUIRE( v == vref );
+  } );
+
+  REQUIRE( called == 1 );
+}
+
+SECTION( "join_no_storage" ) {
+  ecs::components_storage s;
+  s.add_entity_component< Position >( 200, 3.1415f, 2.7182f );
+  const auto& pref = s.add_entity_component< Position >( 201, 1.0f, 2.0f );
+
+  size_t called = 0;
+  s.join< Position, Velocity >( [ & ]( const ecs::eid_t id, const Position& p, const Velocity& v ) {
+    ++called;
+  } );
+
+  REQUIRE( called == 0 );
+}
+
+
 }
