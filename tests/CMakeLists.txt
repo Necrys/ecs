@@ -13,8 +13,12 @@ add_executable ( storage
   storage.cpp
 )
 
+add_executable ( registry
+  registry.cpp
+)
+
 list ( APPEND tests
-  sparse_vector type_enumerator storage
+  sparse_vector type_enumerator storage registry
 )
 
 include ( FetchContent )
