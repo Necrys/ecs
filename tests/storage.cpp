@@ -167,10 +167,10 @@ SECTION( "join" ) {
 SECTION( "join_no_storage" ) {
   ecs::components_storage s;
   s.add_entity_component< Position >( 200, 3.1415f, 2.7182f );
-  const auto& pref = s.add_entity_component< Position >( 201, 1.0f, 2.0f );
+  s.add_entity_component< Position >( 201, 1.0f, 2.0f );
 
   size_t called = 0;
-  s.join< Position, Velocity >( [ & ]( const ecs::eid_t id, const Position& p, const Velocity& v ) {
+  s.join< Position, Velocity >( [ & ]( const ecs::eid_t, const Position&, const Velocity& ) {
     ++called;
   } );
 

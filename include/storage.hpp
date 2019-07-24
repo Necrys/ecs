@@ -7,23 +7,27 @@ namespace ecs {
 template < typename T >
 sparse_vector< T >& components_storage::get_or_create_storage() {
   const auto idx = component_type< T >::id;
-  auto it = m_componentStorages.find( idx );
-  if ( it == m_componentStorages.end() ) {
-    it = m_componentStorages.emplace( idx, new sparse_vector< T >() ).first;
+
+  if ( m_componentStorages.size() <= idx ) {
+    m_componentStorages.resize( idx + 1, nullptr );
   }
 
-  return static_cast< sparse_vector< T >& >( *( it->second ) );
+  if ( !m_componentStorages[ idx ] ) {
+    m_componentStorages[ idx ] = static_cast< sparse_vector_base* >( new sparse_vector< T >() );
+  }
+
+  return static_cast< sparse_vector< T >& >( *( m_componentStorages[ idx ] ) );
 }
 
 template < typename T >
 sparse_vector< T >* components_storage::get_storage() const {
   const auto idx = component_type< T >::id;
-  auto it = m_componentStorages.find( idx );
-  if ( it == m_componentStorages.end() ) {
+
+  if ( m_componentStorages.size() <= idx ) {
     return nullptr;
   }
 
-  return static_cast< sparse_vector< T >* >( it->second );
+  return static_cast< sparse_vector< T >* >( m_componentStorages[ idx ] );
 }
 
 template < typename T, typename... Ts >
@@ -45,7 +49,7 @@ T* components_storage::get_entity_component( const eid_t id ) {
 template < typename T >
 const T* components_storage::get_entity_component( const eid_t id ) const {
   const auto storage = get_storage< T >();
-  if ( storage->exist( id ) ) {
+  if ( storage && storage->exist( id ) ) {
     return &storage->get_unsafe( id );
   }
 
@@ -113,14 +117,18 @@ void components_storage::get_index_range( eid_t& min_index, eid_t& max_index ) {
 }
 
 components_storage::~components_storage() {
-  for ( const auto& s : m_componentStorages ) {
-    delete s.second;
+  for ( auto s : m_componentStorages ) {
+    if ( s ) {
+      delete s;
+    }
   }
 }
 
 void components_storage::remove_all_components( const eid_t id ) {
-  for ( const auto storage : m_componentStorages ) {
-    storage.second->erase( id );
+  for ( const auto s : m_componentStorages ) {
+    if ( s ) {
+      s->erase( id );
+    }
   }
 }
 
