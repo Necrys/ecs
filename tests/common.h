@@ -23,3 +23,15 @@ struct Velocity {
     return x == other.x && y == other.y;
   }
 };
+
+struct Event {
+};
+
+class System {
+public:
+  void update() {
+  }
+
+  void handle_event( const Event& ) {
+  }
+};

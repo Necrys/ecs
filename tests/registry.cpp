@@ -93,3 +93,14 @@ SECTION( "remove" ) {
 }
 
 }
+
+TEST_CASE( "systems" ) {
+
+SECTION( "register" ) {
+
+  ecs::registry r;
+  r.add_system< System >();
+
+}
+
+}
