@@ -68,8 +68,12 @@ elseif ( CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang" )
       -ftest-coverage
       --coverage
   )
-
 endif ()
+
+target_link_libraries( ${target}
+  PRIVATE
+    ecs
+)
 
 target_include_directories( ${target}
   PRIVATE
