@@ -5,10 +5,15 @@ set ( CMAKE_CXX_STANDARD 11 )
 set ( CMAKE_CXX_STANDARD_REQUIRED ON )
 set ( CMAKE_CXX_EXTENSIONS OFF )
 
-add_library( ecs INTERFACE )
+add_library( ecs
+  src/registry.cpp
+  src/components_storage.cpp
+  src/entity.cpp
+  src/system_base.cpp
+)
 
 target_include_directories ( ecs
-  INTERFACE
+  PUBLIC
     ${CMAKE_CURRENT_LIST_DIR}/include
 )
 

@@ -116,20 +116,4 @@ void components_storage::get_index_range( eid_t& min_index, eid_t& max_index ) {
   get_index_range< Rs... >( min_index, max_index );
 }
 
-components_storage::~components_storage() {
-  for ( auto s : m_componentStorages ) {
-    if ( s ) {
-      delete s;
-    }
-  }
-}
-
-void components_storage::remove_all_components( const eid_t id ) {
-  for ( const auto s : m_componentStorages ) {
-    if ( s ) {
-      s->erase( id );
-    }
-  }
-}
-
 }

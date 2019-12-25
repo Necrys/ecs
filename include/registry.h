@@ -3,6 +3,8 @@
 #include "storage.h"
 
 #include <list>
+#include <set>
+#include <memory>
 
 namespace ecs {
   class entity;
