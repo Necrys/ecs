@@ -272,9 +272,9 @@ size_t sparse_vector< T, PageSize >::page::min_index() const {
 template < typename T, size_t PageSize >
 size_t sparse_vector< T, PageSize >::page::max_index() const {
   size_t result = bad_index;
-  for ( size_t i = PageSize - 1; i >= 0; --i ) {
-    if ( m_index[ i ] != bad_index ) {
-      result = i;
+  for ( size_t i = PageSize; i > 0; --i ) {
+    if ( m_index[ i - 1 ] != bad_index ) {
+      result = i - 1;
       break;
     }
   }

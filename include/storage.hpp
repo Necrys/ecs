@@ -103,9 +103,8 @@ void components_storage::get_index_range( eid_t& min_index, eid_t& max_index ) {
   }
 }
 
-template < class T, class... Rs,
-  class = typename std::enable_if< sizeof...( Rs ) != 0 >::type >
-void components_storage::get_index_range( eid_t& min_index, eid_t& max_index ) {
+template < class T, class... Rs >
+typename std::enable_if< sizeof...( Rs ) != 0 >::type components_storage::get_index_range( eid_t& min_index, eid_t& max_index ) {
   const auto storage = get_storage< T >();
   if ( storage ) {
     const auto range = storage->index_range();

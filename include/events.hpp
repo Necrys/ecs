@@ -26,7 +26,7 @@ void event_handler< E >::handle_all() {
 
   for ( const auto& e : m_events[ m_current ] ) {
     for ( auto& cb : m_callbacks ) {
-      if ( m_registry.m_systems[ cb.sid ] && m_registry.m_systems[ cb.sid ]->enabled() )
+      if ( m_registry.is_system_active( cb.sid ) )
         cb.f( e );
     }
   }

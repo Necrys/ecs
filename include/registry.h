@@ -53,20 +53,20 @@ namespace ecs {
 
     void update();
 
+    bool is_system_active( const size_t sid ) const;
+
   private:
     template < typename S, typename E >
     void register_system( system_wrapper< S >& system );
 
-    template < typename S, typename E, typename... Rs,
-      class = typename std::enable_if< ( sizeof...( Rs ) > 0 ) >::type >
-    void register_system( system_wrapper< S >& system );
+    template < typename S, typename E, typename... Rs >
+    typename std::enable_if< ( sizeof...( Rs ) > 0 ) >::type register_system( system_wrapper< S >& system );
 
     template < typename T >
     void add_system_dependencies( const size_t sys_id );
 
-    template < typename T, typename... Rs,
-      class = typename std::enable_if< ( sizeof...( Rs ) > 0 ) >::type >
-    void add_system_dependencies( const size_t sys_id );
+    template < typename T, typename... Rs >
+    typename std::enable_if< ( sizeof...( Rs ) > 0 ) >::type add_system_dependencies( const size_t sys_id );
 
     bool rebuild_system_dependency_tree();
 

@@ -41,7 +41,7 @@ if ( CMAKE_CXX_COMPILER_ID MATCHES "MSVC" )
   )
   target_compile_definitions ( ${target}
     PRIVATE
-      _HAS_ITERATOR_DEBUGGING=0
+      _HAS_ITERATOR_DEBUGGING=1
   )
 elseif ( CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang" )
   target_compile_options ( ${target}
