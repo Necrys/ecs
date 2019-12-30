@@ -88,7 +88,7 @@ void components_storage::join( Ft&& f ) {
   eid_t min_index( std::numeric_limits< eid_t >::max() ), max_index( 0 );
   get_index_range< Ts... >( min_index, max_index );
 
-  for ( eid_t i = min_index; i < max_index; ++i ) {
+  for ( eid_t i = min_index; i <= max_index; ++i ) {
     join_impl< Ts... >( i, std::forward< Ft >( f ) );
   }
 }
