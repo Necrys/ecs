@@ -20,6 +20,31 @@ namespace ecs {
   const size_t component_type< T >::id = type_collection< component_storages >::type_id< T >();
 
   class components_storage {
+    template < typename... Ts >
+    class join_exclude_wrapper {
+    private:
+      template < class Ft, class... Rs >
+      void join_impl( const eid_t id, Ft&& f, Rs&&... rs );
+
+      template < class T, class... TsJoin, class Ft, class... Rs >
+      void join_impl( const eid_t id, Ft&& f, Rs&&... rs );
+
+      template < class Ft >
+      void exclude_impl( const eid_t id, Ft&& f );
+
+      template < class T, class... TsEx, class Ft >
+      void exclude_impl( const eid_t id, Ft&& f );
+
+    public:
+      join_exclude_wrapper( components_storage& storage );
+    
+      template < typename... TsEx, typename Ft >
+      void exclude( Ft&& func );
+
+    private:
+      components_storage& m_storage;
+    };
+
   public:
     ~components_storage();
 
@@ -44,6 +69,9 @@ namespace ecs {
 
     template < typename... Cs, typename Ft >
     void join( Ft&& func );
+
+    template < typename... Ts >
+    join_exclude_wrapper< Ts... > join();
 
   private:
     template < typename T >

@@ -177,5 +177,25 @@ SECTION( "join_no_storage" ) {
   REQUIRE( called == 0 );
 }
 
+SECTION( "join_exclude" ) {
+  ecs::components_storage s;
+  s.add_entity_component< Position >( 200, 3.1415f, 2.7182f );
+  s.add_entity_component< Position >( 201, 1.0f, 2.0f );
+  s.add_entity_component< Position >( 202, 3.1415f, 2.7182f );
+  s.add_entity_component< Position >( 203, 3.1415f, 2.7182f );
+  
+  s.add_entity_component< Velocity >( 201, 1.4142f, 9.81f );
+  s.add_entity_component< Velocity >( 203, 1.4142f, 9.81f );
+
+  size_t called = 0;
+  s
+    .join< Position >()
+    .exclude< Velocity >( [ & ]( const ecs::eid_t, const Position& ) {
+    ++called;
+  } );
+
+  REQUIRE( called == 2 );
+}
+
 
 }

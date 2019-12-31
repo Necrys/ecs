@@ -88,6 +88,10 @@ void components_storage::join( Ft&& f ) {
   eid_t min_index( std::numeric_limits< eid_t >::max() ), max_index( 0 );
   get_index_range< Ts... >( min_index, max_index );
 
+  if ( min_index == std::numeric_limits< eid_t >::max() ) {
+    return;
+  }
+
   for ( eid_t i = min_index; i <= max_index; ++i ) {
     join_impl< Ts... >( i, std::forward< Ft >( f ) );
   }
@@ -113,6 +117,61 @@ typename std::enable_if< sizeof...( Rs ) != 0 >::type components_storage::get_in
   }
 
   get_index_range< Rs... >( min_index, max_index );
+}
+
+template < typename... Ts >
+components_storage::join_exclude_wrapper< Ts... > components_storage::join() {
+  return components_storage::join_exclude_wrapper< Ts... >( *this );
+}
+
+template < typename... Ts >
+template < class Ft, class... Rs >
+void components_storage::join_exclude_wrapper< Ts... >::join_impl( const eid_t id, Ft&& f, Rs&&... rs ) {
+  f( id, rs... );
+}
+
+template < typename... Ts >
+template < class T, class... TsJoin, class Ft, class... Rs >
+void components_storage::join_exclude_wrapper< Ts... >::join_impl( const eid_t id, Ft&& f, Rs&&... rs ) {
+  const auto storage = m_storage.get_storage< T >();
+  if ( !storage || !storage->exist( id ) ) {
+    return;
+  }
+
+  join_impl < TsJoin... >( id, std::forward< Ft >( f ), std::forward< Rs >( rs )..., storage->get_unsafe( id ) );
+}
+
+template < typename... Ts >
+template < class Ft >
+void components_storage::join_exclude_wrapper< Ts... >::exclude_impl( const eid_t id, Ft&& f ) {
+  join_impl < Ts... >( id, std::forward< Ft >( f ) );
+}
+
+template < typename... Ts >
+template < class T, class... TsEx, class Ft >
+void components_storage::join_exclude_wrapper< Ts... >::exclude_impl( const eid_t id, Ft&& f ) {
+  const auto storage = m_storage.get_storage< T >();
+  if ( !storage || storage->exist( id ) ) {
+    return;
+  }
+
+  exclude_impl < TsEx... >( id, std::forward< Ft >( f ) );
+}
+
+template < typename... Ts >
+components_storage::join_exclude_wrapper< Ts... >::join_exclude_wrapper( components_storage& storage ):
+  m_storage( storage ) {
+}
+
+template < typename... Ts >
+template < typename... TsEx, typename Ft >
+void components_storage::join_exclude_wrapper< Ts... >::exclude( Ft&& func ) {
+  eid_t min_index( std::numeric_limits< eid_t >::max() ), max_index( 0 );
+  m_storage.get_index_range< Ts... >( min_index, max_index );
+
+  for ( eid_t i = min_index; i <= max_index; ++i ) {
+    exclude_impl< TsEx... >( i, std::forward< Ft >( func ) );
+  }
 }
 
 }
