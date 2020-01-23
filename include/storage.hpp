@@ -151,7 +151,7 @@ template < typename... Ts >
 template < class T, class... TsEx, class Ft >
 void components_storage::join_exclude_wrapper< Ts... >::exclude_impl( const eid_t id, Ft&& f ) {
   const auto storage = m_storage.get_storage< T >();
-  if ( !storage || storage->exist( id ) ) {
+  if ( storage && storage->exist( id ) ) {
     return;
   }
 
