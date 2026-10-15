@@ -133,14 +133,22 @@ std::pair< size_t, size_t > sparse_vector< T, PageSize >::index_range() const {
 }
 
 template < typename T, size_t PageSize >
-void sparse_vector< T, PageSize >::clear() {
-  for ( auto& pg : m_pages ) {
-    if ( pg ) {
-      delete pg;
-    }
-  }
+sparse_vector< T, PageSize >::~sparse_vector() {
+  clear_and_release();
+}
 
+template < typename T, size_t PageSize >
+void sparse_vector< T, PageSize >::clear() {
+  clear_and_release();
   m_pages.swap( std::vector< page* >() );
+}
+
+template < typename T, size_t PageSize >
+void sparse_vector< T, PageSize >::clear_and_release() {
+  for ( auto& pg : m_pages ) {
+    delete pg;
+    pg = nullptr;
+  }
 }
 
 template < typename T, size_t PageSize >
@@ -182,6 +190,13 @@ sparse_vector< T, PageSize >::page::page():
 }
 
 template < typename T, size_t PageSize >
+sparse_vector< T, PageSize >::page::~page() {
+  for ( size_t i = 0; i < m_size; ++i ) {
+    reinterpret_cast< T* >( m_data + i )->~T();
+  }
+}
+
+template < typename T, size_t PageSize >
 T& sparse_vector< T, PageSize >::page::insert( const size_t pos, const T& arg ) {
   assert( pos < PageSize );
 
@@ -212,11 +227,11 @@ void sparse_vector< T, PageSize >::page::erase( const size_t pos ) {
     return;
   }
 
-  reinterpret_cast< const T* >( m_data + m_index[ pos ] )->~T();
+  reinterpret_cast< T* >( m_data + m_index[ pos ] )->~T();
 
   for ( size_t i = m_index[ pos ] + 1; i < m_size; ++i ) {
-    *reinterpret_cast< T* >( m_data + ( i - 1 ) ) = std::move( *reinterpret_cast< const T* >( m_data + i ) );
-    reinterpret_cast< const T* >( m_data + i )->~T();
+    *reinterpret_cast< T* >( m_data + ( i - 1 ) ) = std::move( *reinterpret_cast< T* >( m_data + i ) );
+    reinterpret_cast< T* >( m_data + i )->~T();
     --m_index[ m_back_index[ i ] ];
     m_back_index[ i - 1 ] = m_back_index[ i ];
   }
@@ -314,9 +329,9 @@ void sparse_vector< T, PageSize >::page::take_place( const size_t pos, Args&&...
     // shift elements
     size_t endIdx = m_index[ next ];
     for ( size_t i = m_size; i > endIdx; --i ) {
-      *reinterpret_cast< T* >( m_data + i ) = std::move( *reinterpret_cast< const T* >( m_data + ( i - 1 ) ) );
-      reinterpret_cast< const T* >( m_data + ( i - 1 ) )->~T();
-      ++m_index[ m_back_index [ i - 1 ] ];
+      *reinterpret_cast< T* >( m_data + i ) = std::move( *reinterpret_cast< T* >( m_data + ( i - 1 ) ) );
+      reinterpret_cast< T* >( m_data + ( i - 1 ) )->~T();
+      ++m_index[ m_back_index[ i - 1 ] ];
       m_back_index[ i ] = m_back_index[ i - 1 ];
     }
 

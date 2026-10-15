@@ -1,6 +1,44 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <sparse_vector.h>
+#include <utility>
+
+namespace {
+
+  // Counts live instances so tests can prove that elements are destroyed when a
+  // page or the whole vector goes away. Without that, components with a
+  // non-trivial destructor leak their resources.
+  struct Counted {
+    static int live;
+
+    int value;
+
+    explicit Counted( const int v ):
+      value( v ) {
+      ++live;
+    }
+
+    Counted( const Counted& other ):
+      value( other.value ) {
+      ++live;
+    }
+
+    Counted( Counted&& other ) noexcept:
+      value( other.value ) {
+      ++live;
+    }
+
+    Counted& operator= ( const Counted& ) = default;
+    Counted& operator= ( Counted&& ) noexcept = default;
+
+    ~Counted() {
+      --live;
+    }
+  };
+
+  int Counted::live = 0;
+
+}
 
 TEST_CASE( "init" ) {
 
@@ -291,6 +329,50 @@ SECTION( "index_range_different_pages" ) {
     
     REQUIRE( range.first == 13 );
     REQUIRE( range.second == 66 );
+}
+
+}
+
+TEST_CASE( "element_lifetime" ) {
+
+SECTION( "destructor_destroys_elements" ) {
+    REQUIRE( Counted::live == 0 );
+
+    {
+        ecs::sparse_vector< Counted > v;
+        v.emplace( 0, 1 );
+        v.emplace( 1, 2 );
+        v.emplace( 100, 3 );   // second page, so both pages are covered
+
+        REQUIRE( Counted::live == 3 );
+    }
+
+    REQUIRE( Counted::live == 0 );
+}
+
+SECTION( "clear_destroys_elements" ) {
+    ecs::sparse_vector< Counted > v;
+    v.emplace( 0, 1 );
+    v.emplace( 100, 2 );
+
+    REQUIRE( Counted::live == 2 );
+
+    v.clear();
+
+    REQUIRE( Counted::live == 0 );
+}
+
+SECTION( "erase_last_element_of_page_releases_page" ) {
+    ecs::sparse_vector< Counted > v;
+    v.emplace( 0, 1 );
+
+    REQUIRE( Counted::live == 1 );
+
+    v.erase( 0 );
+
+    // The page becomes empty and is deleted, which used to lose the element.
+    REQUIRE( Counted::live == 0 );
+    REQUIRE( v.exist( 0 ) == false );
 }
 
 }

@@ -17,6 +17,8 @@ class sparse_vector: public sparse_vector_base {
 public:
   static const size_t bad_index;
 
+  ~sparse_vector() override;
+
   // modify
   void clear();
 
@@ -45,6 +47,7 @@ private:
   class page {
   public:
     page();
+    ~page();
 
     T& insert( const size_t pos, const T& arg );
 
@@ -78,6 +81,7 @@ private:
   page& get_or_create_page( const size_t page_idx );
   page* get_page( const size_t page_idx ) const;
   void erase_page( const size_t page_idx );
+  void clear_and_release();
 
   std::vector< page* > m_pages;
 };
