@@ -107,6 +107,10 @@ include( Catch )
 
 foreach ( target ${tests} )
   catch_discover_tests( ${target}
+    # [slow] cases are left out of the default set: exhausting the entity id space
+    # takes about fifteen seconds, and the rest of the suite takes a fraction of
+    # one. Run them deliberately - the case says how.
+    TEST_SPEC "~[slow]"
     # Names are prefixed with the binary: "init" exists in more than one file.
     TEST_PREFIX ${target}.
     PROPERTIES
