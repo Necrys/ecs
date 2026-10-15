@@ -58,11 +58,11 @@ EXCLUDE_PATTERN = r"(^|[\\/])(tests|bench|check|build|_deps)[\\/]"
 # 15.10.2026 after the dependency machinery and the const accessors were covered,
 # and they only move up. Lowering one is a decision, not a maintenance step.
 #
-# The default run leaves exactly one library line out: the throw for an exhausted
-# entity id space, which costs 2^32 - 1 allocations (~15 s in Release, ~67 s in
-# MSVC Debug). Its case is tagged [slow] and --slow runs it, which takes lines to
-# 100%; the floor is set for the run that does not, because that is the one a
-# commit is checked with.
+# Lines are at 100% because the last uncovered one - the throw for an exhausted
+# entity id space - is now exercised by an ordinary run: its case is tagged [slow]
+# and registered like any other, and the whole space is handed out in about 15 s in
+# Release and 67 s in MSVC Debug. There is no partial mode, so a new library line
+# that no test reaches fails the gate rather than being excused by a flag.
 #
 # The function percentage is dominated by template instantiations - one per
 # component pack in selection.hpp, storage.hpp and sparse_vector.hpp - so it says
@@ -71,8 +71,8 @@ EXCLUDE_PATTERN = r"(^|[\\/])(tests|bench|check|build|_deps)[\\/]"
 # compiler emits arcs for exceptions, static initialisation and short-circuit
 # operators, where the source has nothing to decide.
 MIN_FUNCTIONS_PCT = 77.0
-MIN_LINES_PCT = 99.5
-MIN_BRANCHES_PCT = 91.0
+MIN_LINES_PCT = 100.0
+MIN_BRANCHES_PCT = 91.5
 
 
 def find_llvm_tool(name: str) -> str | None:
@@ -213,8 +213,6 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Measure library coverage with clang and llvm-cov.")
     parser.add_argument("--no-build", action="store_true", help="do not configure or build")
     parser.add_argument("--no-tests", action="store_true", help="do not run the tests")
-    parser.add_argument("--slow", action="store_true",
-                        help="also run the cases tagged [slow], which the default set skips")
     parser.add_argument("--uncovered", action="store_true", help="list lines no test reaches")
     parser.add_argument("--html", metavar="DIR", help="also write an HTML report there")
     parser.add_argument("--lcov", metavar="FILE", default=str(BUILD_DIR / "merged.lcov"),
@@ -271,27 +269,6 @@ def main() -> int:
         if result.returncode != 0:
             print("error: the instrumented test run failed", file=sys.stderr)
             return 1
-
-        if args.slow:
-            # The [slow] cases are deliberately not registered with CTest, so the
-            # only way to include them is to ask the binaries for them directly.
-            # A binary without such a case reports that nothing matched, which is
-            # not a failure at this point.
-            say("== running the [slow] cases")
-            for binary in binaries:
-                result = subprocess.run(
-                    [str(binary), "[slow]"],
-                    cwd=REPO_ROOT,
-                    env=environment,
-                    capture_output=True,
-                    text=True,
-                    encoding="utf-8",
-                    errors="replace",
-                )
-                output = (result.stdout or "") + (result.stderr or "")
-                if result.returncode != 0 and "No tests ran" not in output:
-                    print(f"error: the [slow] cases failed in {binary.name}:\n{output}", file=sys.stderr)
-                    return 1
 
     raw = sorted(profiles.glob("*.profraw"))
     if not raw:
