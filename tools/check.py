@@ -326,10 +326,13 @@ def step_tidy(shell: Shell) -> bool:
         raise EnvironmentError("clang-tidy was not found. Install LLVM, or set CLANG_TIDY to its path.")
 
     database = REPO_ROOT / "build" / TIDY_PRESET
-    if shell.reconfigure or not (database / "CMakeCache.txt").is_file():
-        if shell.run(["cmake", "--preset", TIDY_PRESET]).returncode != 0:
-            say(f"   FAILED: cmake --preset {TIDY_PRESET}")
-            return False
+    # Configured on every run, not only when the cache is missing: this step never
+    # builds, so nothing regenerates the compile database for us, and a file added
+    # since it was written would simply not be checked. The configure itself costs
+    # about a second.
+    if shell.run(["cmake", "--preset", TIDY_PRESET]).returncode != 0:
+        say(f"   FAILED: cmake --preset {TIDY_PRESET}")
+        return False
 
     compile_commands = database / "compile_commands.json"
     if not compile_commands.is_file():
