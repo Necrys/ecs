@@ -56,10 +56,10 @@ Verified configurations:
 
 | Platform | Compiler | State |
 |---|---|---|
-| Windows x64 | MSVC 19.38 (VS 2022) | builds |
-| Windows x64 | Clang (`clang-cl`), Clang (GNU mode) | builds |
+| Windows x64 | MSVC 19.38 (VS 2022) | builds, tests pass |
+| Windows x64 | Clang (`clang-cl`), Clang (GNU mode) | builds, tests pass |
 | Raspberry Pi 1/2 (ARMv6/ARMv7, Raspbian 13) | GCC 14.2 | builds, tests pass |
-| Linux x64 | GCC, Clang | target platform, build not verified yet |
+| Linux x64 | GCC 14, Clang 22 | builds, tests pass |
 
 MinGW-w64 and macOS are not on the list: there is no tooling available to build
 and check them, and claiming unverified support is meaningless. They will be
@@ -109,6 +109,12 @@ Every report is published as an artefact of the run - JUnit XML, the merged lcov
 tracefile, the HTML coverage report - and the run page carries a summary with the
 test counts and the coverage numbers. Nothing is committed back into the
 repository: results are run data, not source.
+
+The branch floor is set per platform, because the metric is not comparable across
+ABIs: on the Itanium ABI every call that can throw gets a landing pad, so the Linux
+build instruments branches that the MSVC ABI never creates, and cold ones of those
+are never taken by a passing test. `tools/coverage.py` carries both numbers and the
+reason.
 
 ---
 
