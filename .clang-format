@@ -1,0 +1,147 @@
+# clang-format configuration for the ecs library.
+#
+# This ruleset is derived from the style that already dominates the existing
+# sources, so applying it should mostly normalise the few inconsistent spots
+# rather than restyle the whole project. Where the current code disagrees with
+# itself (for example header files indent the body of `namespace`, the
+# implementation files do not), the majority variant wins and the minority is
+# normalised to it.
+#
+# Apply / verify with:  tools/format.ps1 -Check
+#                       clang-format --dry-run --Werror <file>
+#
+# The reasoning behind the non-obvious choices is recorded in CODE_STYLE.md.
+
+---
+Language: Cpp
+BasedOnStyle: LLVM
+Standard: c++17
+
+# ---------------------------------------------------------------------------
+# Indentation
+# ---------------------------------------------------------------------------
+IndentWidth: 2
+TabWidth: 2
+UseTab: Never
+ContinuationIndentWidth: 2
+AccessModifierOffset: -2
+IndentAccessModifiers: false
+# 13 of 18 files do not indent the body of `namespace ecs {`, so the majority
+# wins and the five headers that do indent are normalised.
+NamespaceIndentation: None
+
+# ---------------------------------------------------------------------------
+# Braces. The opening brace stays on the same line everywhere: that is what the
+# sources do for classes/structs (19 occurrences, 0 on their own line) and for
+# functions (78 vs 1). Lambdas keep a space before the brace, as in
+# `[ & ]( const E& e ){ ... }`; clang-format cannot express that combination,
+# so lambdas are formatted the conventional way instead.
+# ---------------------------------------------------------------------------
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterCaseLabel: false
+  AfterClass: false
+  AfterControlStatement: false
+  AfterEnum: false
+  AfterFunction: false
+  AfterNamespace: false
+  AfterStruct: false
+  AfterUnion: false
+  AfterExternBlock: false
+  BeforeCatch: false
+  BeforeElse: false
+  BeforeLambdaBody: false
+  BeforeWhile: false
+  IndentBraces: false
+  SplitEmptyFunction: true
+  SplitEmptyRecord: true
+  SplitEmptyNamespace: true
+
+# No single-line function bodies. The original sources use them in a handful of
+# places (`Position() {}`) but the library code prefers explicit two-line
+# bodies, and a consistent choice is worth more than saving four lines.
+AllowShortFunctionsOnASingleLine: None
+AllowShortBlocksOnASingleLine: false
+AllowShortCaseLabelsOnASingleLine: false
+AllowShortEnumsOnASingleLine: false
+AllowShortIfStatementsOnASingleLine: false
+AllowShortLambdasOnASingleLine: All
+AllowShortLoopsOnASingleLine: false
+
+# ---------------------------------------------------------------------------
+# Spacing. The house style pads parentheses, brackets, angle brackets and
+# braces:  foo( arg ),  arr[ i ],  vector< T >,  template < typename T >.
+# ---------------------------------------------------------------------------
+SpaceAfterCStyleCast: false
+SpaceAfterLogicalNot: false
+SpaceAfterTemplateKeyword: true
+SpaceBeforeAssignmentOperators: true
+SpaceBeforeCaseColon: false
+SpaceBeforeCpp11BracedList: false
+SpaceBeforeInheritanceColon: true
+SpaceBeforeParens: ControlStatementsExceptControlMacros
+SpaceBeforeRangeBasedForLoopColon: true
+SpaceBeforeSquareBrackets: false
+SpaceInEmptyBlock: false
+SpaceAroundPointerQualifiers: Default
+
+SpacesInParentheses: true
+SpacesInSquareBrackets: true
+SpacesInAngles: true
+SpacesInCStyleCastParentheses: true
+SpacesInContainerLiterals: true
+Cpp11BracedListStyle: false
+
+# ---------------------------------------------------------------------------
+# Line breaking
+# ---------------------------------------------------------------------------
+ColumnLimit: 120
+BinPackArguments: false
+BinPackParameters: false
+AllowAllArgumentsOnNextLine: true
+AllowAllParametersOfDeclarationOnNextLine: true
+AlignAfterOpenBracket: BlockIndent
+AlignOperands: Align
+# Alignment of consecutive assignments/declarations is deliberately off: the
+# alignment that exists in the sources is incidental, and enabling it produced
+# noisy padding around if-statements and lambda setup lines.
+AlignConsecutiveAssignments: false
+AlignConsecutiveDeclarations: false
+AlignConsecutiveMacros: false
+AlignEscapedNewlines: Right
+PenaltyReturnTypeOnItsOwnLine: 60
+
+# ---------------------------------------------------------------------------
+# Constructors: the colon stays on the declaration line (`registry::registry() :`)
+# and initialisers are indented by two.
+# ---------------------------------------------------------------------------
+BreakConstructorInitializers: AfterColon
+ConstructorInitializerIndentWidth: 2
+PackConstructorInitializers: Never
+
+# ---------------------------------------------------------------------------
+# Misc
+# ---------------------------------------------------------------------------
+AlwaysBreakTemplateDeclarations: Yes
+ReflowComments: true
+# Include ordering is a deliberate decision, not a formatter decision.
+SortIncludes: Never
+IncludeBlocks: Preserve
+FixNamespaceComments: false
+MaxEmptyLinesToKeep: 1
+KeepEmptyLinesAtTheStartOfBlocks: false
+# The sources are left-aligned: `registry* owner`, `T& add(...)`, `const T* p`.
+PointerAlignment: Left
+DerivePointerAlignment: false
+
+# ---------------------------------------------------------------------------
+# Note: clang-format removed SpaceInEmptyParentheses in v19, so empty argument
+# lists are always emitted as `foo()` and never `foo( )`. That matches the
+# existing sources, which use `()` 225 times and `( )` never.
+#
+# Note: the tests currently place Catch2 SECTION blocks at column zero.
+# clang-format treats SECTION as an ordinary nested block, so it indents them.
+# This is accepted as part of the one-time normalisation; the test layout is
+# expected to be revisited when the test framework is updated (see PLAN).
+# ---------------------------------------------------------------------------
+...

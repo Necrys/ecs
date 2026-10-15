@@ -1,0 +1,200 @@
+# AGENTS.md - ecs
+
+A short map of the project for people and agents. The purpose of this file is to
+provide enough context to avoid rescanning the whole repository before every
+task.
+
+---
+
+## 1. What this is
+
+`ecs` is a small header-heavy **Entity-Component-System** library for C++.
+An entity is an identifier; components are ordinary user-defined structs stored
+in typed containers; systems are objects with an `update()` method that
+subscribe to events and declare dependencies between each other.
+
+**Project priorities, in descending order:**
+
+1. **Performance** - the main goal. Component iteration must scale with the
+   number of entities, not with the largest identifier.
+2. **Multithreading** - a component access model that allows independent
+   systems to run in parallel.
+3. **Lightweight** - minimal dependencies, little code, fast builds.
+4. **Portability** - Windows (MSVC, Clang), Linux (GCC, Clang),
+   Raspberry Pi 1/2 (ARMv6/ARMv7, 32-bit).
+
+Configurations verified against the current code: MSVC (VS 2022), Clang in MSVC
+mode (`clang-cl`) and Clang in GNU mode, all on Windows x64. Linux and
+Raspberry Pi are target platforms and have not been verified yet. MinGW-w64 and
+macOS are currently out of scope: there is no way to build or check them, and
+claiming unverified support is meaningless.
+
+The library is provided as is: this is a non-commercial hobby project and you
+use it at your own risk. The license is the Unlicense (public domain), with no
+conditions attached. Tests, benchmarks and visualisations are shipped as
+test/demo material and are not part of the library itself.
+
+---
+
+## 2. Branches and commits
+
+- **`master` is the only development branch.** All work happens here.
+- **`2020_last` is frozen history.** The last state of the original 2020 line.
+  **Do not commit, merge, rebase or delete it.** The branch exists only for
+  comparison and archaeology. It is mirrored by the annotated tag `2020-last`,
+  pinned to the same commit.
+- Feature branches are cut from `master` and merged back; do not keep
+  long-lived side branches.
+
+Commit messages: a short line in the imperative mood, without prefixes such as
+`feat:` / `fix:`, matching the historical line of the repository. One task, one
+logical commit. Everything in the repository - code, comments, documentation,
+commit messages - is written in **English**.
+
+---
+
+## 3. Current state (important to understand before starting)
+
+`master` is in an intermediate state: part of what is planned is not
+implemented, part is outdated, and part has known defects. **Current behaviour
+is not a contract.** The list of defects and unfinished work, with rationale, is
+kept in the plan's registry; check it before touching an area so as not to
+rediscover what is known and not to polish what is going to be rewritten anyway.
+
+The broad picture:
+
+- the library itself (component storage, registry, systems, events) exists but
+  needs to be brought to a working state;
+- tests exist but do not build in the current state;
+- there are no benchmarks at all;
+- multithreading, resources and deferred operations are not implemented;
+- there is no user-facing documentation beyond `README.md`.
+
+**Rule: do not polish code that is going to be rewritten.** Before changing an
+architectural area, make sure it is not marked as pending replacement.
+
+---
+
+## 4. Repository layout
+
+```
+ecs/
+|-- .clang-format          formatting rules (verified, idempotent)
+|-- CMakeLists.txt         library build
+|-- CODE_STYLE.md          code style: required reading before editing code
+|-- AGENTS.md              this file
+|-- README.md              introduction to the project
+|-- LICENSE                Unlicense (public domain)
+|-- include/               public headers
+|   |-- types.h                eid_t and common types
+|   |-- sparse_vector.h/.hpp   paged sparse array (the storage core)
+|   |-- storage.h/.hpp         component storages, join/exclude
+|   |-- entity.h/.hpp          entity handle
+|   |-- registry.h/.hpp        registry: entities, systems, events
+|   |-- system.h/.hpp          systems, dependencies, configuration
+|   |-- events.h/.hpp          event queues
+|   `-- type_enumerator.h      assigns ids to component/system/event types
+|-- src/                   non-template .cpp implementations
+|-- tests/                 unit tests (Catch2)
+`-- tools/                 helper scripts (formatting)
+```
+
+File naming convention: `*.h` holds declarations, `*.hpp` holds template and
+inline implementations, and `src/*.cpp` holds non-template implementations. New
+code should be laid out the same way.
+
+---
+
+## 5. Building and running tests
+
+The library is static and has no external dependencies. The tests pull Catch2
+through `FetchContent`; in the current state this is **broken** (there is no
+`GIT_TAG`, and Catch2 renamed the `master` branch to `devel`), which makes
+fixing the tests one of the first tasks. `ECS_BUILD_TESTS` is on by default, so
+the default configuration currently fails.
+
+```powershell
+# Windows / MSVC, from the repository root
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
+cmake --build build
+```
+
+```bash
+# Linux / GCC or Clang
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+cmake --build build -j
+```
+
+With MSVC it is convenient to call `vcvars64.bat` once, otherwise `cmake` will
+not find the compiler.
+
+---
+
+## 6. Rules for agents
+
+### General
+
+- **Develop on `master` only.** Do not touch `2020_last` (see section 2).
+- **Do not add third-party dependencies** without explicit agreement: the goal
+  is to stay lightweight and build using nothing but the compiler.
+- **Do not change `LICENSE`** on your own - that is the author's decision.
+- **Do not create documentation nobody reads.** See section 7.
+- **Write in English**: code, identifiers, comments, documentation and commit
+  messages.
+
+### Before editing code
+
+1. Read `CODE_STYLE.md`.
+2. Make sure the area is not pending replacement: a local fix in a place that is
+   going to be rewritten anyway is pointless.
+3. For changes on the hot path (`join`, `sparse_vector`, `get_*`), measure
+   first, change second. A change without a measurement is not accepted.
+
+### After editing code
+
+1. Run the formatter. On Windows: `./tools/format.ps1`; on any platform:
+   `python tools/format.py`. To check without changing anything, use `-Check` /
+   `--check`.
+2. Build without warnings at the highest warning level.
+3. Run the tests. If functionality was added, add a test; if a defect was fixed,
+   add a regression test.
+4. Do not leave commented-out code or debug output behind.
+
+### What not to do
+
+- Do not refactor unrelated things along the way.
+- Do not "improve" style by hand: `clang-format` owns style.
+- Do not write essay-length comments (see section 7).
+
+---
+
+## 7. Documentation: what to write and where
+
+Priority order, from most to least important.
+
+1. **Self-documenting code.** Names of types, functions and parameters should
+   explain their purpose without a comment. If a signature needs a comment to be
+   understood, rename first and comment only if it is still necessary.
+2. **Comments.** Lightweight, one or two lines, only for what is not obvious:
+   invariants, the reason behind an unusual decision, pitfalls. No history, no
+   restating the code, no research rationale. A comment that repeats the code is
+   deleted.
+3. **Separate documentation.** The README is general project information; usage
+   examples will appear later, once the API stabilises. Documentation generated
+   from source will be added only if there is a real need; there is no reason to
+   set it up in advance.
+
+**The repository must not reference material that is not in it.** Anyone who
+clones the project should see nothing extraneous; plans, history and design
+rationale live separately from the code and do not go into the repository.
+
+---
+
+## 8. Quick reference
+
+| Question | Where to look |
+|---|---|
+| How to lay out code | `CODE_STYLE.md` |
+| What is built and how | `CMakeLists.txt`, `README.md` |
+| How to format | `tools/format.ps1` (Windows), `tools/format.py` (anywhere), `.clang-format` |
+| API entry points | `include/registry.h`, `include/entity.h`, `include/storage.h` |
