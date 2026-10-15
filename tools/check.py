@@ -363,6 +363,7 @@ def step_tidy(shell: Shell) -> bool:
     # check name can arrive either way.
     findings: dict[str, int] = {}
     failed = 0
+    samples: list[str] = []
     for source in sorted(set(sources)):
         result = shell.run([clang_tidy, "-p", str(database), source], capture=True)
         output = (result.stdout or "") + (result.stderr or "")
@@ -374,6 +375,10 @@ def step_tidy(shell: Shell) -> bool:
             for name in names:
                 findings[name.strip()] = findings.get(name.strip(), 0) + 1
             reported = True
+            # A count tells you something is wrong; the first few lines tell you
+            # what, which is the difference between a report and a puzzle.
+            if len(samples) < 15:
+                samples.append(line.strip())
         if result.returncode != 0 and ("error:" in output or reported):
             failed += 1
             if not reported:
@@ -381,6 +386,14 @@ def step_tidy(shell: Shell) -> bool:
 
     total = sum(findings.values())
     say(f"   {len(set(sources))} files, {total} findings, {failed} files with errors")
+
+    if samples:
+        # Some diagnostics have no check tag to be counted under - a compilation
+        # clang-tidy could not handle at all, for instance - so they are printed
+        # whether or not the count looks small.
+        say("   first diagnostics:")
+        for sample in samples:
+            say(f"     {sample[:200]}")
 
     if failed:
         return False
