@@ -53,7 +53,20 @@ build\msvc\bench\bench_iter.exe --quick
 
 # append results to a CSV kept outside the repository
 build\msvc\bench\bench_iter.exe --csv ..\..\bench-data\run.csv
+
+# pin to one physical core per core, and raise the process priority
+build\msvc\bench\bench_iter.exe --pin
+
+# pin to one specific core instead
+build\msvc\bench\bench_iter.exe --core 4
 ```
+
+**Use `--pin` for anything you intend to compare.** Where a process runs matters as
+much as the code: migration between cores carries the working set to a cold cache,
+and a sibling thread on the same physical core steals cache and execution slots.
+Pinning removes both, and it is reported either way so that a number whose
+scheduling conditions are unknown does not get compared with anything. A negative
+side effect is that the benchmark then measures one core rather than the machine.
 
 The three binaries split by concern:
 
@@ -63,8 +76,9 @@ The three binaries split by concern:
 | `bench_structure` | structural change: allocate, deallocate, reuse ids, add and remove components |
 | `bench_access` | point access: `get` for a present and an absent component |
 
-Each starts by printing the machine it found and the workload it chose, then one
-line per measured point, and finishes with a checksum.
+Each starts by printing the machine it found, its cache hierarchy and its
+scheduling conditions, then the workload it chose, then one line per measured
+point, and finishes with a checksum.
 
 ---
 
@@ -117,14 +131,23 @@ Two mechanisms keep a point trustworthy:
    are in a steady state. For a large working set the warmup is shortened, since
    building it costs more than the measurement, but it is never removed: without
    one pass the first timed sample pays for every page fault.
-2. **Sample length.** A timed sample repeats the work until it lasts at least
-   50 ms. A sample lasting a fraction of a millisecond is at the mercy of a
-   single preemption. The repetition count is estimated from the *fastest* of a
-   few trial runs, because sizing every sample from an outlying first run leaves
-   the samples far longer than intended.
+2. **Sample length.** One timed sample repeats the work until it lasts at least
+   50 ms, and that repetition count is then frozen for every sample of the point.
+   The count is calibrated from the *median* of several single runs and confirmed
+   on real samples, because estimating it from the fastest run biases it
+   downwards. This is not a detail: a point measured in ~0.1 ms came out bimodal
+   on this machine, its median jumping between two states, while the same point
+   batched into milliseconds held to a few percent.
 
 If a point stays noisy no matter how long the sample, that is a finding in
-itself: report it as unstable and do not build an argument on it.
+itself. **Cache set conflicts from page placement are real and are not fixed by
+pinching the harness**: within one process the samples of a wide id spread are
+tight (a few percent), while the medians of separate launches of the same binary
+move by tens of percent, and a wide spread is exactly where page placement decides
+which cache sets collide. The remedies are to compare within a session and to treat
+a small number of wide-span points as approximate. The benchmarks are linked
+without a dynamic base, which removes one source of layout variation, but on the
+machine measured here it did not make those medians stable on its own.
 
 ---
 

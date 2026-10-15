@@ -13,6 +13,16 @@
 if ( MSVC )
   set ( ECS_BENCH_OPT_FLAGS /O2 /Ob2 /DNDEBUG )
   set ( ECS_BENCH_WARN_FLAGS /W3 )
+
+  # Address space layout randomisation is a documented source of unreproducible
+  # noise, and the mechanism fits what was observed here: within one process the
+  # samples of a wide id spread are tight, while the medians of separate launches
+  # move by tens of percent, and a wide spread is exactly where page placement
+  # decides cache set conflicts. Linking without a dynamic base is the standard
+  # remedy. On this machine it did not make the medians stable on its own, so it is
+  # kept as a reduction in variables rather than as a fix; runs are compared
+  # within a session regardless. The library and the tests keep the default.
+  set ( ECS_BENCH_LINK_FLAGS /DYNAMICBASE:NO )
 elseif ( CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang" )
   set ( ECS_BENCH_OPT_FLAGS -O2 -DNDEBUG )
   set ( ECS_BENCH_WARN_FLAGS -Wall -Wextra )
@@ -28,9 +38,10 @@ set ( benchmarks
 
 foreach ( bench ${benchmarks} )
   string ( REPLACE "bench_" "" source_name ${bench} )
-  add_executable ( ${bench} ${source_name}.cpp )
+  add_executable ( ${bench} ${source_name}.cpp keep_alive.cpp )
   target_link_libraries ( ${bench} PRIVATE ecs )
   target_compile_options ( ${bench} PRIVATE ${ECS_BENCH_OPT_FLAGS} ${ECS_BENCH_WARN_FLAGS} )
+  target_link_options ( ${bench} PRIVATE ${ECS_BENCH_LINK_FLAGS} )
 
   # Benchmarks are never tests: running them belongs to a deliberate, local
   # decision, not to a test run.

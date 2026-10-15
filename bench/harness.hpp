@@ -12,6 +12,7 @@
 #include "machine.hpp"
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
@@ -19,7 +20,6 @@
 #include <functional>
 #include <string>
 #include <vector>
-
 namespace bench {
 
 // -----------------------------------------------------------------------------
@@ -115,6 +115,10 @@ inline size_t cache_budget( const MachineInfo& info, const size_t fallback = 8u 
 
 struct Stats {
   size_t samples = 0;
+  // Repetitions inside one sample, after calibration. Recorded because a point
+  // whose samples are short is measuring the operating system as much as the
+  // code, and that is invisible otherwise.
+  int repeat = 0;
   double p10_ms = 0.0;
   double median_ms = 0.0;
   double p90_ms = 0.0;
@@ -212,6 +216,57 @@ inline RunConfig quick_config() {
   config.bulk_warmup = 0;
   config.large_samples = 3;
   return config;
+}
+
+// Command line shared by every benchmark:
+//
+//   --quick          short run, for checking that a change moves at all
+//   --csv <path>     append results to a CSV, outside the repository
+//   --pin            pin the process to the fastest cores and raise its priority
+//   --core <n>       pin to one specific core instead
+//
+// Pinning is opt-in because its effect is machine-specific, but it is reported
+// either way: a number whose scheduling conditions are unknown cannot be
+// compared with anything.
+struct CommandLine {
+  RunConfig config;
+  std::string csv_path;
+  bool pin = false;
+  int core = -1;
+};
+
+inline CommandLine parse_command_line( const int argc, char** argv ) {
+  CommandLine line;
+
+  for ( int i = 1; i < argc; ++i ) {
+    const std::string argument = argv[ i ];
+    if ( argument == "--quick" ) {
+      line.config = quick_config();
+    } else if ( argument == "--pin" ) {
+      line.pin = true;
+    } else if ( argument == "--core" && i + 1 < argc ) {
+      line.core = std::atoi( argv[ ++i ] );
+      line.pin = true;
+    } else if ( argument == "--csv" && i + 1 < argc ) {
+      line.csv_path = argv[ ++i ];
+    }
+  }
+
+  return line;
+}
+
+// Applies the requested scheduling conditions and reports them. Called before
+// anything is measured, because sharing a core or migrating between cores changes
+// the numbers by more than most code changes do.
+inline AffinityState apply_scheduling( const CommandLine& line ) {
+  if ( !line.pin ) {
+    print_affinity( AffinityState(), false );
+    return AffinityState();
+  }
+
+  const AffinityState state = pin_process( line.core );
+  print_affinity( state, true );
+  return state;
 }
 
 // Explains a point whose spread is too wide to draw a conclusion from. The
@@ -365,22 +420,70 @@ print_csv_row( std::FILE* out, const RunContext& context, const Result& result, 
 // Runs `work` once and returns its duration in milliseconds. The value returned
 // by `work` is accumulated by the caller into a checksum so that the compiler
 // cannot conclude the work is unobservable and remove it.
+// -----------------------------------------------------------------------------
+// Keeping work alive
+//
+// A checksum printed at the end of a run is not enough on its own: the compiler
+// may still hoist the work out of the timed region or sink it past the clock
+// reading, and then the benchmark times nothing. These helpers put an explicit
+// escape inside the measured region, following what Google Benchmark does.
+// -----------------------------------------------------------------------------
+
+#if defined( _MSC_VER )
+// Forces a value into memory the compiler cannot reason about. An out-of-line
+// function whose parameter is a volatile pointer is the portable way to do this
+// on MSVC; the pointer is never dereferenced.
+extern "C" void bench_keep_alive( void const volatile* value );
+#pragma comment( linker, "/INCLUDE:bench_keep_alive" )
+#endif
+
+// Makes the value look used, so the computation that produced it cannot be
+// discarded.
+template < typename T >
+inline void keep( T&& value ) {
+#if defined( _MSC_VER )
+  bench_keep_alive( &reinterpret_cast< char const volatile& >( value ) );
+#else
+  asm volatile( "" : "+r,m"( value ) : : "memory" );
+#endif
+}
+
+// A compiler barrier: nothing may move across it. Used after timing so that work
+// cannot sink out of the measured region.
+inline void clobber_memory() {
+#if defined( _MSC_VER )
+  std::atomic_signal_fence( std::memory_order_acq_rel );
+#else
+  asm volatile( "" : : : "memory" );
+#endif
+}
+
+// Runs `work` once and returns its duration in milliseconds. The value returned
+// by `work` is accumulated by the caller into a checksum so that the compiler
+// cannot conclude the work is unobservable and remove it.
 template < typename F >
 double time_once_ms( F&& work ) {
   const auto start = std::chrono::steady_clock::now();
   work();
   const auto finish = std::chrono::steady_clock::now();
+  clobber_memory();
   return std::chrono::duration< double, std::milli >( finish - start ).count();
 }
 
 // Measures `work` at one point: warmup, then `samples` timed runs.
 //
-// Each timed sample repeats the work until it has run for at least
-// `min_sample_ms`. A sample lasting a fraction of a millisecond is at the mercy
-// of whatever the operating system does during it: a single preemption then
-// dominates the reading and inflates the spread of the point. Lengthening the
-// window averages that noise inside the sample instead of letting it move the
-// quartiles.
+// The repetition count is calibrated so that one sample lasts at least
+// `min_sample_ms`, then frozen for every sample of the point. Two details matter,
+// and both were established by measurement on this machine:
+//
+//   * the estimate uses the MEDIAN of a few runs, not the fastest one. Taking the
+//     minimum biases the count downwards, and a sample that is too short is at
+//     the mercy of single scheduler events: a point measured in ~0.1 ms came out
+//     bimodal, while the same point batched into milliseconds held to a few
+//     percent;
+//   * the chosen count is confirmed on real samples and raised if the observed
+//     duration falls short, because the estimate can still be optimistic when the
+//     distribution is wide.
 //
 // `setup` re-runs before every timed run when the scenario mutates its data.
 template < typename Setup, typename Work >
@@ -388,28 +491,49 @@ Stats measure( const RunConfig& config, const size_t units, Setup&& setup, Work&
   const int warmup = units >= 1000000u ? config.bulk_warmup : config.warmup;
   const int samples = units >= config.large_threshold ? config.large_samples : config.samples;
 
-  // How many repetitions make one sample long enough to be trustworthy.
-  //
-  // The estimate is taken from the fastest of a few runs, not from the first
-  // one: the first run of a point is frequently an outlier because of a page
-  // fault or a preemption, and sizing every later sample from it leaves the
-  // samples far longer than intended and the point noisier than it needs to be.
-  //
-  // Setup runs first even here: the work may depend on what setup produced.
-  int repeat = config.scale;
+  // The cost of a single repetition, taken as the median of several so that one
+  // outlier cannot set the size of every sample.
+  double typical_ms = 0.0;
   {
-    double fastest_ms = 0.0;
-    const int trials = 5;
-    for ( int t = 0; t < trials; ++t ) {
-      setup();
-      const double trial_ms = time_once_ms( work );
-      if ( t == 0 || trial_ms < fastest_ms ) {
-        fastest_ms = trial_ms;
-      }
+    std::vector< double > trials;
+    trials.reserve( 7 );
+    for ( int t = 0; t < 7; ++t ) {
+      trials.push_back( time_once_ms( work ) );
     }
-    while ( fastest_ms * static_cast< double >( repeat ) < config.min_sample_ms && repeat < config.max_scale ) {
+    std::sort( trials.begin(), trials.end() );
+    typical_ms = trials[ trials.size() / 2 ];
+  }
+
+  int repeat = config.scale;
+  for ( int attempt = 0; attempt < 6; ++attempt ) {
+    while ( typical_ms * static_cast< double >( repeat ) < config.min_sample_ms && repeat < config.max_scale ) {
       repeat *= 2;
     }
+
+    // Confirm on real samples; the median of three again, since a single run is
+    // exactly what cannot be trusted here.
+    setup();
+    std::vector< double > confirm;
+    for ( int c = 0; c < 3; ++c ) {
+      confirm.push_back( time_once_ms( [ & ] {
+        for ( int r = 0; r < repeat; ++r ) {
+          work();
+        }
+      } ) );
+    }
+    std::sort( confirm.begin(), confirm.end() );
+
+    if ( confirm[ 1 ] >= config.min_sample_ms || repeat >= config.max_scale ) {
+      break;
+    }
+
+    // Still too short: scale in proportion to what was actually observed.
+    const double measured = confirm[ 1 ] > 0.0 ? confirm[ 1 ] : config.min_sample_ms;
+    int next = static_cast< int >( static_cast< double >( repeat ) * ( config.min_sample_ms / measured ) * 1.3 ) + 1;
+    if ( next <= repeat ) {
+      next = repeat + 1;
+    }
+    repeat = next < config.max_scale ? next : config.max_scale;
   }
 
   for ( int i = 0; i < warmup; ++i ) {
@@ -431,7 +555,9 @@ Stats measure( const RunConfig& config, const size_t units, Setup&& setup, Work&
     } ) );
   }
 
-  return summarise( durations, units * static_cast< size_t >( repeat ) );
+  Stats stats = summarise( durations, units * static_cast< size_t >( repeat ) );
+  stats.repeat = repeat;
+  return stats;
 }
 
 // -----------------------------------------------------------------------------

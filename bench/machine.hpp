@@ -11,6 +11,7 @@
 #include <fstream>
 #include <string>
 #include <thread>
+#include <vector>
 
 #if defined( _WIN32 )
 // windows.h defines min and max as macros unless told not to, and the library
@@ -27,6 +28,7 @@
 #include <intrin.h>
 #endif
 #else
+#include <sched.h>
 #include <sys/sysinfo.h>
 #include <unistd.h>
 #endif
@@ -299,6 +301,168 @@ inline void print_machine( const MachineInfo& info ) {
   if ( !info.cache_sizes_known ) {
     std::printf( "#   note       : cache sizes unavailable; workload sized from RAM only\n" );
   }
+}
+
+// -----------------------------------------------------------------------------
+// Execution environment
+//
+// Where a process runs, and how willingly the scheduler moves it, matters as
+// much as the code being measured: a benchmark that migrates between cores
+// carries its working set to a cold cache each time, and one sharing a core with
+// other work is timed alongside it. Both are controlled here, so a run can pin
+// itself down and then say in its own output whether it succeeded.
+// -----------------------------------------------------------------------------
+
+struct AffinityState {
+  bool pinned = false;          // the mask below was applied
+  bool priority_raised = false; // the process priority was raised
+  int first_cpu = -1;           // lowest core in the applied mask
+  int cpu_count = 0;            // number of cores in the applied mask
+};
+
+// The cores the process may currently run on.
+inline uint64_t current_affinity_mask() {
+#if defined( _WIN32 )
+  DWORD_PTR process_mask = 0;
+  DWORD_PTR system_mask = 0;
+  if ( GetProcessAffinityMask( GetCurrentProcess(), &process_mask, &system_mask ) ) {
+    return static_cast< uint64_t >( process_mask );
+  }
+  return 0;
+#else
+  cpu_set_t set;
+  CPU_ZERO( &set );
+  if ( sched_getaffinity( 0, sizeof( set ), &set ) == 0 ) {
+    uint64_t mask = 0;
+    for ( int cpu = 0; cpu < CPU_SETSIZE && cpu < 64; ++cpu ) {
+      if ( CPU_ISSET( cpu, &set ) ) {
+        mask |= ( 1ull << cpu );
+      }
+    }
+    return mask;
+  }
+  return 0;
+#endif
+}
+
+inline void describe_affinity( AffinityState& state, const uint64_t mask ) {
+  state.first_cpu = -1;
+  state.cpu_count = 0;
+  for ( int cpu = 0; cpu < 64; ++cpu ) {
+    if ( mask & ( 1ull << cpu ) ) {
+      if ( state.first_cpu < 0 ) {
+        state.first_cpu = cpu;
+      }
+      ++state.cpu_count;
+    }
+  }
+}
+
+// Pins the process to one core, or to the fastest cores the platform reports.
+//
+// `core` selects a specific core; a negative value asks for the fastest cores
+// available, which on a hybrid part means the performance cores. When the
+// platform refuses, the run continues unpinned and reports that rather than
+// failing: a benchmark that cannot pin still produces a number, just a noisier
+// one.
+inline AffinityState pin_process( const int core ) {
+  AffinityState state;
+
+#if defined( _WIN32 )
+  DWORD_PTR target = 0;
+
+  if ( core >= 0 ) {
+    target = ( static_cast< DWORD_PTR >( 1 ) << core );
+  } else {
+    DWORD length = 0;
+    GetLogicalProcessorInformationEx( RelationProcessorCore, nullptr, &length );
+    if ( length != 0 ) {
+      std::vector< unsigned char > buffer( length );
+      if (
+        GetLogicalProcessorInformationEx(
+          RelationProcessorCore, reinterpret_cast< PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX >( buffer.data() ), &length
+        )
+      ) {
+        // One logical processor per physical core. The first core is taken from
+        // each entry rather than the whole mask: sharing a physical core with a
+        // sibling thread would reintroduce exactly the interference pinning is
+        // meant to remove.
+        DWORD offset = 0;
+        while ( offset < length ) {
+          const auto* entry =
+            reinterpret_cast< const SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX* >( buffer.data() + offset );
+          if ( entry->Relationship == RelationProcessorCore ) {
+            const DWORD_PTR mask = static_cast< DWORD_PTR >( entry->Processor.GroupMask[ 0 ].Mask );
+            // Lowest set bit: the first logical processor of this core.
+            const DWORD_PTR single = mask & ( ~mask + 1 );
+            if ( single != 0 ) {
+              target |= single;
+            }
+          }
+          offset += entry->Size;
+        }
+      }
+    }
+  }
+
+  if ( target != 0 && SetProcessAffinityMask( GetCurrentProcess(), target ) ) {
+    state.pinned = true;
+    describe_affinity( state, static_cast< uint64_t >( target ) );
+  }
+
+  if ( SetPriorityClass( GetCurrentProcess(), HIGH_PRIORITY_CLASS ) ) {
+    state.priority_raised = true;
+  }
+#else
+  cpu_set_t set;
+  CPU_ZERO( &set );
+
+  if ( core >= 0 ) {
+    CPU_SET( core, &set );
+  } else {
+    // One logical processor per physical core, on the same reasoning as above.
+    const int reported = static_cast< int >( sysconf( _SC_NPROCESSORS_ONLN ) );
+    const int physical =
+      std::thread::hardware_concurrency() != 0 ? static_cast< int >( std::thread::hardware_concurrency() ) : reported;
+    for ( int cpu = 0; cpu < physical && cpu < CPU_SETSIZE; ++cpu ) {
+      CPU_SET( cpu, &set );
+    }
+  }
+
+  if ( sched_setaffinity( 0, sizeof( set ), &set ) == 0 ) {
+    state.pinned = true;
+    describe_affinity( state, current_affinity_mask() );
+  }
+
+  // Best effort: an unprivileged process may not be allowed to raise this, which
+  // is not a reason to abandon a benchmark.
+  if ( nice( -10 ) != -1 ) {
+    state.priority_raised = true;
+  }
+#endif
+
+  return state;
+}
+
+inline void print_affinity( const AffinityState& state, const bool requested ) {
+  if ( !requested ) {
+    AffinityState current;
+    describe_affinity( current, current_affinity_mask() );
+    std::printf( "#   affinity   : not requested; free to run on %d core(s)\n", current.cpu_count );
+    return;
+  }
+
+  if ( !state.pinned ) {
+    std::printf( "#   affinity   : pinning requested but refused by the platform\n" );
+    return;
+  }
+
+  std::printf(
+    "#   affinity   : pinned to %d core(s), lowest cpu%d; priority %s\n",
+    state.cpu_count,
+    state.first_cpu,
+    state.priority_raised ? "raised to high" : "left unchanged"
+  );
 }
 
 } // namespace bench

@@ -55,20 +55,17 @@ struct Health {
 } // namespace
 
 int main( int argc, char** argv ) {
-  bench::RunConfig config;
-  std::string csv_path;
-
-  for ( int i = 1; i < argc; ++i ) {
-    const std::string argument = argv[ i ];
-    if ( argument == "--quick" ) {
-      config = bench::quick_config();
-    } else if ( argument == "--csv" && i + 1 < argc ) {
-      csv_path = argv[ ++i ];
-    }
-  }
+  const bench::CommandLine line = bench::parse_command_line( argc, argv );
+  const bench::RunConfig config = line.config;
+  const std::string csv_path = line.csv_path;
 
   const bench::MachineInfo machine = bench::detect_machine();
   bench::print_machine( machine );
+
+  // Pinning comes after the machine report, which describes the whole system
+  // rather than the subset this process is allowed on.
+  const bench::AffinityState scheduling = bench::apply_scheduling( line );
+  ( void )scheduling;
 
   const size_t budget = bench::memory_budget( machine );
   const size_t largest = bench::entities_for_budget( budget, 24u );
