@@ -375,20 +375,23 @@ TEST_CASE( "entity_handles" ) {
 // Exhausting the id space is the only way to reach the throw in allocate(), and
 // it is reachable: eid_t is 32 bits, so the counter hands out 2^32 - 1 ids before
 // it runs out, at a few nanoseconds per call. Measured on the development machine:
-// 3.63 ns per allocate() in Release, about 15 s for the full space; Debug and the
-// boards are slower still.
+// 3.63 ns per allocate() in Release, about 15 s for the full space; MSVC Debug
+// takes 65 s, and the boards will be slower still.
+//
+// It costs no memory - measured, not assumed: the working set moves by less than
+// a tenth of a megabyte while the whole space is handed out, because allocate()
+// only advances a counter. Nothing may be remembered per entity here, though: a
+// vector of the handles would be 8 bytes each, which is 34 GB for the full space.
 //
 // The tag keeps it out of the default CTest set (tests/CMakeLists.txt asks the
 // discovery step to skip [slow]), because a suite that runs in a fraction of a
-// second should not grow a fifteen-second case by default. Run it deliberately:
+// second should not grow a minute-long case by default. Run it deliberately:
 //
 //   build/tests-only/tests/registry.exe "[slow]"
 //   python tools/coverage.py --slow
 TEST_CASE( "entity_id_space_exhaustion", "[slow]" ) {
   ecs::registry r;
 
-  // allocate() only advances a counter: nothing is stored per entity, so the
-  // whole space fits in a loop without allocating memory.
   const auto limit = static_cast< size_t >( ecs::entity::bad_id );
   for ( size_t i = 0; i < limit; ++i ) {
     r.allocate();
