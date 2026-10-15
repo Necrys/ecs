@@ -90,10 +90,14 @@ template < class... Cs >
 bool components_storage::exists_all( const eid_t id ) const {
   bool result = true;
 
-  ( void ) std::initializer_list< int >{ ( result = result && [ & ] {
-    const auto storage = get_storage< Cs >();
-    return storage != nullptr && storage->exist( id );
-  }(), 0 )... };
+  ( void )std::initializer_list< int >{ (
+    result = result &&
+             [ & ] {
+               const auto storage = get_storage< Cs >();
+               return storage != nullptr && storage->exist( id );
+             }(),
+    0
+  )... };
 
   return result;
 }
@@ -113,7 +117,7 @@ components_storage::join_exclude_wrapper< Ts... > components_storage::join() {
 }
 
 template < typename... Ts >
-components_storage::join_exclude_wrapper< Ts... >::join_exclude_wrapper( components_storage& storage ):
+components_storage::join_exclude_wrapper< Ts... >::join_exclude_wrapper( components_storage& storage ) :
   m_storage( storage ) {
 }
 

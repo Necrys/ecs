@@ -163,6 +163,11 @@ inline Stats summarise( std::vector< double > samples_ms, const size_t units ) {
 // -----------------------------------------------------------------------------
 
 struct RunConfig {
+  // Seed for anything a scenario randomises. Fixed so that the same run repeated
+  // produces the same data: a benchmark whose workload changes between runs
+  // cannot be compared with its own baseline.
+  uint32_t seed = 20260115u;
+
   // Warmup runs are discarded. Their purpose is to fill the caches, settle the
   // branch predictor and let the allocator reach a steady state, so that the
   // measured runs are not paying for first-touch costs.
@@ -389,11 +394,14 @@ Stats measure( const RunConfig& config, const size_t units, Setup&& setup, Work&
   // one: the first run of a point is frequently an outlier because of a page
   // fault or a preemption, and sizing every later sample from it leaves the
   // samples far longer than intended and the point noisier than it needs to be.
+  //
+  // Setup runs first even here: the work may depend on what setup produced.
   int repeat = config.scale;
   {
     double fastest_ms = 0.0;
     const int trials = 5;
     for ( int t = 0; t < trials; ++t ) {
+      setup();
       const double trial_ms = time_once_ms( work );
       if ( t == 0 || trial_ms < fastest_ms ) {
         fastest_ms = trial_ms;

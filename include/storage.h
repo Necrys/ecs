@@ -9,80 +9,80 @@
 #include <vector>
 
 namespace ecs {
-  struct component_storages {};
-  struct component_type_base {};
+struct component_storages {};
+struct component_type_base {};
 
-  template < typename >
-  struct component_type: public component_type_base {
-    static const size_t id;
-  };
+template < typename >
+struct component_type : public component_type_base {
+  static const size_t id;
+};
 
-  template < typename T >
-  const size_t component_type< T >::id = type_collection< component_storages >::type_id< T >();
+template < typename T >
+const size_t component_type< T >::id = type_collection< component_storages >::type_id< T >();
 
-  class components_storage;
+class components_storage;
 
-  class components_storage {
-    // Presents one selection step: the components to walk, and the components to
-    // reject. Returned by join(), so that the two read as one expression.
-    template < typename... Ts >
-    class join_exclude_wrapper {
-    public:
-      explicit join_exclude_wrapper( components_storage& storage );
-
-      template < typename... TsEx, typename Ft >
-      void exclude( Ft&& func );
-
-    private:
-      components_storage& m_storage;
-    };
-
+class components_storage {
+  // Presents one selection step: the components to walk, and the components to
+  // reject. Returned by join(), so that the two read as one expression.
+  template < typename... Ts >
+  class join_exclude_wrapper {
   public:
-    ~components_storage();
+    explicit join_exclude_wrapper( components_storage& storage );
 
-    /* modify */
-    template < typename T, typename... Ts >
-    T& add_entity_component( const eid_t id, Ts&&... ts );
-
-    template < typename T, typename... Ts >
-    T& set_entity_component( const eid_t id, const T& t );
-
-    template < typename T >
-    void remove_entity_component( const eid_t id );
-
-    void remove_all_components( const eid_t id );
-
-    /* access */
-    template < typename T >
-    T* get_entity_component( const eid_t id );
-
-    template < typename T >
-    const T* get_entity_component( const eid_t id ) const;
-
-    // The typed view of one component's storage, or null when the type has never
-    // been used. Public because a selection has to reach it from outside the
-    // class, and because it is the honest description of what the container
-    // holds: one storage per component type.
-    template < typename T >
-    sparse_vector< T >* get_storage() const;
-
-    /* selection */
-    template < typename... Cs, typename Ft >
-    void join( Ft&& func );
-
-    template < typename... Ts >
-    join_exclude_wrapper< Ts... > join();
+    template < typename... TsEx, typename Ft >
+    void exclude( Ft&& func );
 
   private:
-    template < typename T >
-    sparse_vector< T >& get_or_create_storage();
-
-    // True when every listed component is present on the id.
-    template < class... Cs >
-    bool exists_all( const eid_t id ) const;
-
-    std::vector< sparse_vector_base* > m_componentStorages;
+    components_storage& m_storage;
   };
+
+public:
+  ~components_storage();
+
+  /* modify */
+  template < typename T, typename... Ts >
+  T& add_entity_component( const eid_t id, Ts&&... ts );
+
+  template < typename T, typename... Ts >
+  T& set_entity_component( const eid_t id, const T& t );
+
+  template < typename T >
+  void remove_entity_component( const eid_t id );
+
+  void remove_all_components( const eid_t id );
+
+  /* access */
+  template < typename T >
+  T* get_entity_component( const eid_t id );
+
+  template < typename T >
+  const T* get_entity_component( const eid_t id ) const;
+
+  // The typed view of one component's storage, or null when the type has never
+  // been used. Public because a selection has to reach it from outside the
+  // class, and because it is the honest description of what the container
+  // holds: one storage per component type.
+  template < typename T >
+  sparse_vector< T >* get_storage() const;
+
+  /* selection */
+  template < typename... Cs, typename Ft >
+  void join( Ft&& func );
+
+  template < typename... Ts >
+  join_exclude_wrapper< Ts... > join();
+
+private:
+  template < typename T >
+  sparse_vector< T >& get_or_create_storage();
+
+  // True when every listed component is present on the id.
+  template < class... Cs >
+  bool exists_all( const eid_t id ) const;
+
+  std::vector< sparse_vector_base* > m_componentStorages;
+};
 }
 
 #include "storage.hpp"

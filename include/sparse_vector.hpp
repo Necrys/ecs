@@ -11,7 +11,8 @@ namespace ecs {
 //
 //=============================================================================
 template < typename T, size_t PageSize >
-inline typename sparse_vector< T, PageSize >::page& sparse_vector< T, PageSize >::get_or_create_page( const size_t page_idx ) {
+inline typename sparse_vector< T, PageSize >::page&
+sparse_vector< T, PageSize >::get_or_create_page( const size_t page_idx ) {
   if ( m_pages.size() <= page_idx ) {
     m_pages.resize( page_idx + 1, nullptr );
   }
@@ -24,7 +25,8 @@ inline typename sparse_vector< T, PageSize >::page& sparse_vector< T, PageSize >
 }
 
 template < typename T, size_t PageSize >
-inline typename sparse_vector< T, PageSize >::page* sparse_vector< T, PageSize >::get_page( const size_t page_idx ) const {
+inline typename sparse_vector< T, PageSize >::page*
+sparse_vector< T, PageSize >::get_page( const size_t page_idx ) const {
   page* result( nullptr );
   if ( m_pages.size() > page_idx ) {
     result = m_pages[ page_idx ];
@@ -113,7 +115,7 @@ const T& sparse_vector< T, PageSize >::get_unsafe( const size_t pos ) const noex
 
 // safe access with on-access creation
 template < typename T, size_t PageSize >
-T& sparse_vector< T, PageSize >::operator[] ( const size_t pos ) {
+T& sparse_vector< T, PageSize >::operator[]( const size_t pos ) {
   assert( pos < bad_index );
 
   auto& pg = get_or_create_page( pos / PageSize );
@@ -214,9 +216,7 @@ template < typename T, size_t PageSize >
 void sparse_vector< T, PageSize >::reserve( const size_t count ) {
   assert( count < bad_index );
 
-  size_t pages_count = ( count % PageSize == 0 )
-    ? ( count / PageSize )
-    : ( count / PageSize + 1 );
+  size_t pages_count = ( count % PageSize == 0 ) ? ( count / PageSize ) : ( count / PageSize + 1 );
 
   m_pages.resize( pages_count, nullptr );
 
@@ -234,7 +234,7 @@ void sparse_vector< T, PageSize >::reserve( const size_t count ) {
 //=============================================================================
 
 template < typename T, size_t PageSize >
-sparse_vector< T, PageSize >::page::page():
+sparse_vector< T, PageSize >::page::page() :
   m_size( 0 ) {
   m_index.fill( bad_index );
   m_back_index.fill( bad_index );
@@ -333,7 +333,7 @@ const T& sparse_vector< T, PageSize >::page::get_unsafe( const size_t pos ) cons
 }
 
 template < typename T, size_t PageSize >
-T& sparse_vector< T, PageSize >::page::operator[] ( const size_t pos ) {
+T& sparse_vector< T, PageSize >::page::operator[]( const size_t pos ) {
   assert( pos < PageSize );
 
   if ( m_index[ pos ] == bad_index ) {
@@ -352,7 +352,7 @@ size_t sparse_vector< T, PageSize >::page::min_index() const {
       break;
     }
   }
-  
+
   return result;
 }
 
@@ -394,8 +394,8 @@ void sparse_vector< T, PageSize >::page::take_place( const size_t pos, Args&&...
 
   // The first slot whose position is above pos, which is exactly where pos
   // belongs: the positions are kept increasing along the slots.
-  const size_t end_idx = static_cast< size_t >(
-    std::lower_bound( &m_back_index[ 0 ], &m_back_index[ m_size ], pos ) - &m_back_index[ 0 ] );
+  const size_t end_idx =
+    static_cast< size_t >( std::lower_bound( &m_back_index[ 0 ], &m_back_index[ m_size ], pos ) - &m_back_index[ 0 ] );
 
   // Make room in the bookkeeping first, so that the shifts below read the old
   // values and write the new ones without an intermediate buffer. The uppermost

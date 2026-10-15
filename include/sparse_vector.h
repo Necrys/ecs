@@ -13,7 +13,7 @@ public:
 };
 
 template < typename T, size_t PageSize = 64 >
-class sparse_vector: public sparse_vector_base {
+class sparse_vector : public sparse_vector_base {
 public:
   static const size_t bad_index;
 
@@ -37,7 +37,7 @@ public:
   const T& get_unsafe( const size_t pos ) const noexcept;
 
   // safe access with on-access creation
-  T& operator[] ( const size_t pos );
+  T& operator[]( const size_t pos );
 
   std::pair< size_t, size_t > index_range() const;
 
@@ -68,7 +68,7 @@ private:
 
     bool exist( const size_t pos ) const noexcept;
 
-    T& operator[] ( const size_t pos );
+    T& operator[]( const size_t pos );
 
     T& get_unsafe( const size_t pos ) noexcept;
     const T& get_unsafe( const size_t pos ) const noexcept;
@@ -86,10 +86,10 @@ private:
     template < typename... Args >
     void take_place( const size_t pos, Args&&... args );
 
-    std::array< size_t, PageSize >                                   m_index;
-    std::array< size_t, PageSize >                                   m_back_index;
+    std::array< size_t, PageSize > m_index;
+    std::array< size_t, PageSize > m_back_index;
     typename std::aligned_storage< sizeof( T ), alignof( T ) >::type m_data[ PageSize ];
-    size_t                                                           m_size;
+    size_t m_size;
   };
 
   page& get_or_create_page( const size_t page_idx );
