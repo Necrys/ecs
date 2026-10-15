@@ -7,6 +7,11 @@ system_base::system_base() :
   m_enabled( true ) {
 }
 
+// The key function: every other virtual member is inline or pure, so without this
+// definition the vtable would be a weak copy in every translation unit that uses a
+// system, which is what -Wweak-vtables reports on the Itanium ABI.
+system_base::~system_base() = default;
+
 bool system_base::updated() const {
   return m_updated;
 }

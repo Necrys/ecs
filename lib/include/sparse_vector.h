@@ -8,7 +8,11 @@ namespace ecs {
 
 class sparse_vector_base {
 public:
-  virtual ~sparse_vector_base() = default;
+  // Defined out of line, in lib/src/sparse_vector.cpp: a virtual destructor that is
+  // the class's only out-of-line virtual gives the vtable a single home instead of
+  // a weak copy in every translation unit that touches a storage.
+  virtual ~sparse_vector_base();
+
   virtual void erase( const size_t pos ) = 0;
 };
 

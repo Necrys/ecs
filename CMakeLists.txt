@@ -27,6 +27,8 @@ add_library( ecs
   lib/src/registry.cpp
   lib/src/components_storage.cpp
   lib/src/entity.cpp
+  lib/src/events.cpp
+  lib/src/sparse_vector.cpp
   lib/src/system_base.cpp
 )
 

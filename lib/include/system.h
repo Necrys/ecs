@@ -18,7 +18,11 @@ class registry;
 class system_base {
 public:
   system_base();
-  virtual ~system_base() = default;
+
+  // Out of line, in lib/src/system_base.cpp, for the same reason as the other
+  // polymorphic bases: the vtable gets one home instead of a weak copy per
+  // translation unit.
+  virtual ~system_base();
 
   bool updated() const;
 
