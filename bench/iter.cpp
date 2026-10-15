@@ -158,6 +158,7 @@ int main( int argc, char** argv ) {
   // rather than the subset this process is allowed on.
   const bench::AffinityState scheduling = bench::apply_scheduling( line );
   ( void )scheduling;
+  const bench::FrequencyCheck frequency = bench::begin_frequency_check();
 
   const size_t budget = bench::memory_budget( machine );
   const size_t cache = bench::cache_budget( machine );
@@ -413,6 +414,9 @@ int main( int argc, char** argv ) {
       std::printf( "#\n# could not open %s for writing\n", csv_path.c_str() );
     }
   }
+
+  bench::write_samples_file( csv_path, context, results );
+  bench::end_frequency_check( frequency );
 
   std::printf( "#\n# checksum %llu\n", static_cast< unsigned long long >( bench::checksum() ) );
   return 0;

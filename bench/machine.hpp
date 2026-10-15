@@ -5,6 +5,7 @@
 // same binary should produce a meaningful run on a 64 MB-L3 desktop and on a
 // Raspberry Pi 1 with 512 MB of RAM and 16 KB of L1.
 
+#include <chrono>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
@@ -463,6 +464,64 @@ inline void print_affinity( const AffinityState& state, const bool requested ) {
     state.first_cpu,
     state.priority_raised ? "raised to high" : "left unchanged"
   );
+}
+
+// -----------------------------------------------------------------------------
+// Time base
+//
+// Wall-clock time is what a frame costs, but it moves when the core changes
+// frequency, which a boost-happy part does constantly. A cycle count does not.
+// Both are recorded so that a session can be checked for frequency drift: if
+// nanoseconds per cycle changes between two phases of a session, the phases are
+// not comparable whatever the ratios say.
+// -----------------------------------------------------------------------------
+
+inline uint64_t read_cycles() {
+#if defined( _MSC_VER ) || defined( __i386__ ) || defined( __x86_64__ )
+#if defined( _MSC_VER )
+  return __rdtsc();
+#else
+  return __builtin_ia32_rdtsc();
+#endif
+#else
+  // No cheap cycle counter on this target; nanoseconds stay the only measure.
+  return 0;
+#endif
+}
+
+// True when read_cycles() returns something meaningful, so that a report does not
+// print a column of zeroes as if it were data.
+inline bool cycles_available() {
+  return read_cycles() != 0;
+}
+
+// Nanoseconds per cycle over a short interval. Comparing this between the first
+// and last point of a session shows whether the core was running at a consistent
+// frequency throughout.
+inline double measure_ns_per_cycle() {
+  if ( !cycles_available() ) {
+    return 0.0;
+  }
+
+  const auto start_time = std::chrono::steady_clock::now();
+  const uint64_t start_cycles = read_cycles();
+
+  // A short spin, long enough that the clock reading is not the measurement.
+  volatile uint64_t spin = 0;
+  for ( uint64_t i = 0; i < 2000000u; ++i ) {
+    spin += i;
+  }
+
+  const uint64_t end_cycles = read_cycles();
+  const auto end_time = std::chrono::steady_clock::now();
+
+  const double cycles = static_cast< double >( end_cycles - start_cycles );
+  if ( cycles <= 0.0 ) {
+    return 0.0;
+  }
+
+  const double ns = std::chrono::duration< double, std::nano >( end_time - start_time ).count();
+  return ns / cycles;
 }
 
 } // namespace bench

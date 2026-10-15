@@ -151,6 +151,49 @@ machine measured here it did not make those medians stable on its own.
 
 ---
 
+## Comparing two revisions
+
+Absolute figures drift between sessions on this machine — the same binary can move
+by more than ten percent while its own interquartile spread stays under one
+percent. Comparing a new run against a file recorded yesterday therefore proves
+nothing. The comparison that works is **interleaved and paired**: build both
+revisions, run them alternately in one session, and compare each pair.
+
+`ab-interleaved.ps1` (kept with the run history, not in the repository) does this:
+
+```powershell
+# build the other revision into its own tree
+git worktree add ..\base-checkout <commit>
+cmake --preset msvc ; cmake --build --preset msvc          # in that tree
+
+# then, from the tree holding the script
+powershell -File ab-interleaved.ps1 `
+    -A ..\base-checkout\build\msvc\bench\bench_iter.exe `
+    -B .\build\msvc\bench\bench_iter.exe `
+    -Tag a1 -Rounds 5 -Pin
+```
+
+It alternates A B, then B A, and so on. **Alternating the order is not a detail**:
+running A before B in every round gives B a systematic advantage, and a control run
+of one binary against itself measured 2.4 % in B's favour before the order was
+swapped. For each point it reports the per-round ratio, the geometric mean of those
+ratios, and the number of rounds that agreed on a direction. A point is called only
+when every round agrees *and* the effect exceeds five percent; everything else is
+reported as unresolved, which is the honest answer rather than a small number.
+
+Control runs of one binary against itself, pinned, four rounds: 1.020, 0.996,
+0.999, with no point called in the two later runs. Treat an aggregate within about
+two percent as no difference.
+
+The scripts live in the workspace next to the run history:
+
+| File | Purpose |
+|---|---|
+| `compare.ps1` | quick comparison against a recorded baseline, point by point |
+| `ab-interleaved.ps1` | paired interleaved A/B, the one to trust for a verdict |
+
+---
+
 ## Recording runs
 
 Write results to CSV with `--csv <path>`; the header is written if the file does

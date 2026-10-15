@@ -14,6 +14,7 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -130,7 +131,17 @@ struct Stats {
   // up because it moves the quartiles.
   double spread_pct = 0.0;
   double tail_pct = 0.0;
+  // Coefficient of variation, comparable across magnitudes in a way the absolute
+  // spread is not.
+  double cv_pct = 0.0;
   double per_unit_ns = 0.0;
+  // Cycles per unit of work. Invariant to frequency changes, so it is the figure
+  // to compare when the core may have been running at a different clock.
+  double per_unit_cycles = 0.0;
+  // Every sample, in the order taken, so that any statistic can be re-derived
+  // later without re-running and so that a distribution can be looked at rather
+  // than guessed at.
+  std::vector< double > raw_ms;
 };
 
 inline double percentile( const std::vector< double >& sorted, const double fraction ) {
@@ -147,6 +158,9 @@ inline Stats summarise( std::vector< double > samples_ms, const size_t units ) {
     return stats;
   }
 
+  // Kept in the order they were taken, before sorting.
+  stats.raw_ms = samples_ms;
+
   std::sort( samples_ms.begin(), samples_ms.end() );
 
   stats.samples = samples_ms.size();
@@ -158,6 +172,24 @@ inline Stats summarise( std::vector< double > samples_ms, const size_t units ) {
   stats.spread_pct = stats.median_ms > 0.0 ? ( stats.p90_ms - stats.p10_ms ) / stats.median_ms * 100.0 : 0.0;
   stats.tail_pct = stats.median_ms > 0.0 ? ( stats.max_ms - stats.min_ms ) / stats.median_ms * 100.0 : 0.0;
   stats.per_unit_ns = units > 0 ? stats.median_ms * 1e6 / static_cast< double >( units ) : 0.0;
+
+  // Sample standard deviation over the raw samples, reported relative to the
+  // mean as the coefficient of variation.
+  double sum = 0.0;
+  for ( const double value : samples_ms ) {
+    sum += value;
+  }
+  const double mean = sum / static_cast< double >( samples_ms.size() );
+
+  if ( samples_ms.size() > 1 && mean > 0.0 ) {
+    double squares = 0.0;
+    for ( const double value : samples_ms ) {
+      const double delta = value - mean;
+      squares += delta * delta;
+    }
+    const double deviation = std::sqrt( squares / static_cast< double >( samples_ms.size() - 1 ) );
+    stats.cv_pct = deviation / mean * 100.0;
+  }
 
   return stats;
 }
@@ -269,12 +301,38 @@ inline AffinityState apply_scheduling( const CommandLine& line ) {
   return state;
 }
 
-// Explains a point whose spread is too wide to draw a conclusion from. The
-// overwhelmingly common cause is first-touch: the first timed run walks pages
-// that have never been resident, and averages that cost into the median.
-inline void print_spread_hint( const double spread_pct ) {
-  if ( spread_pct > 15.0 ) {
-    std::printf( "%38s hint: wide spread usually means first-touch pages; check the warmup\n", "" );
+// Records the time base at the start of a session. Nanoseconds per cycle moving
+// between the first and last point means the core was running at a different clock
+// during the two, and then the two are not comparable however careful the rest of
+// the harness is.
+struct FrequencyCheck {
+  double ns_per_cycle = 0.0;
+};
+
+inline FrequencyCheck begin_frequency_check() {
+  FrequencyCheck check;
+  check.ns_per_cycle = measure_ns_per_cycle();
+  if ( check.ns_per_cycle > 0.0 ) {
+    std::printf( "#   time base  : %.4f ns/cycle at session start\n", check.ns_per_cycle );
+  } else {
+    std::printf( "#   time base  : no cycle counter available; nanosecond figures only\n" );
+  }
+  return check;
+}
+
+inline void end_frequency_check( const FrequencyCheck& check ) {
+  const double now = measure_ns_per_cycle();
+  if ( check.ns_per_cycle <= 0.0 || now <= 0.0 ) {
+    return;
+  }
+
+  const double drift = ( now - check.ns_per_cycle ) / check.ns_per_cycle * 100.0;
+  std::printf( "#   time base  : %.4f ns/cycle at session end (%+.1f%%)\n", now, drift );
+  if ( drift > 5.0 || drift < -5.0 ) {
+    std::printf(
+      "#   warning    : the core changed clock during this run; comparisons across\n"
+      "#                this session are unreliable\n"
+    );
   }
 }
 
@@ -375,8 +433,9 @@ inline void print_csv_header( std::FILE* out ) {
   std::fprintf(
     out,
     "run_id,timestamp,git_rev,cpu,arch,os,compiler,config,scenario,components,"
-    "entity_count,live_count,id_span,component_bytes,operations,samples,"
-    "p10_ns,median_ns,p90_ns,min_ns,max_ns,iqr_pct,tail_pct,per_unit_ns,notes\n"
+    "entity_count,live_count,id_span,component_bytes,operations,samples,repeat,"
+    "p10_ns,median_ns,p90_ns,min_ns,max_ns,iqr_pct,tail_pct,cv_pct,per_unit_ns,"
+    "per_unit_cycles,notes\n"
   );
 }
 
@@ -384,7 +443,8 @@ inline void
 print_csv_row( std::FILE* out, const RunContext& context, const Result& result, const std::string& timestamp ) {
   std::fprintf(
     out,
-    "%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%zu,%zu,%zu,%zu,%zu,%zu,%.1f,%.1f,%.1f,%.1f,%.1f,%.2f,%.2f,%.3f,%s\n",
+    "%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%zu,%zu,%zu,%zu,%zu,%zu,%d,"
+    "%.1f,%.1f,%.1f,%.1f,%.1f,%.2f,%.2f,%.2f,%.3f,%.3f,%s\n",
     csv_escape( context.run_id ).c_str(),
     csv_escape( timestamp ).c_str(),
     csv_escape( context.git_rev ).c_str(),
@@ -401,6 +461,7 @@ print_csv_row( std::FILE* out, const RunContext& context, const Result& result, 
     result.component_bytes,
     result.operations,
     result.stats.samples,
+    result.stats.repeat,
     result.stats.p10_ms * 1e6,
     result.stats.median_ms * 1e6,
     result.stats.p90_ms * 1e6,
@@ -408,8 +469,43 @@ print_csv_row( std::FILE* out, const RunContext& context, const Result& result, 
     result.stats.max_ms * 1e6,
     result.stats.spread_pct,
     result.stats.tail_pct,
+    result.stats.cv_pct,
     result.stats.per_unit_ns,
+    result.stats.per_unit_cycles,
     csv_escape( result.notes ).c_str()
+  );
+}
+
+// Writes every sample of every point to a separate file, one row per sample.
+//
+// The summary is enough to compare two runs; the raw samples are what makes it
+// possible to look at a distribution later, re-derive any statistic without
+// re-running, and tell a genuine two-state distribution from ordinary scatter.
+// Files with a samples suffix live next to the CSV and are only written when a
+// path is given, so nothing lands in the repository by accident.
+inline void print_samples( std::FILE* out, const RunContext& context, const Result& result ) {
+  for ( size_t i = 0; i < result.stats.raw_ms.size(); ++i ) {
+    std::fprintf(
+      out,
+      "%s,%s,%s,%zu,%zu,%zu,%zu,%zu,%d,%d,%.1f\n",
+      csv_escape( context.run_id ).c_str(),
+      csv_escape( result.scenario ).c_str(),
+      csv_escape( result.components ).c_str(),
+      result.entity_count,
+      result.live_count,
+      result.id_span,
+      result.operations,
+      i,
+      result.stats.repeat,
+      static_cast< int >( result.stats.samples ),
+      result.stats.raw_ms[ i ] * 1e6
+    );
+  }
+}
+
+inline void print_samples_header( std::FILE* out ) {
+  std::fprintf(
+    out, "run_id,scenario,components,entity_count,live_count,id_span,operations,sample_index,repeat,samples,ns\n"
   );
 }
 
@@ -458,15 +554,99 @@ inline void clobber_memory() {
 #endif
 }
 
-// Runs `work` once and returns its duration in milliseconds. The value returned
-// by `work` is accumulated by the caller into a checksum so that the compiler
-// cannot conclude the work is unobservable and remove it.
+// Cycles accumulated by the most recent timed run, and the run that reports them.
+// Recorded alongside nanoseconds because they answer different questions: a core
+// that changes frequency moves one without touching the other.
+inline uint64_t& last_cycles() {
+  static uint64_t value = 0;
+  return value;
+}
+
+// Frozen calibration for one point: how many repetitions make a single sample
+// long enough to be worth timing, decided once and reused for every sample.
+struct Calibration {
+  int repeat = 1;
+  double typical_ms = 0.0; // median cost of one repetition
+  int attempts = 0;        // how many times the estimate had to be raised
+};
+
+// Decides `repeat` such that one sample lasts at least `min_sample_ms`.
+//
+// The estimate uses the median of several single runs rather than the fastest.
+// Taking the minimum biases the count downwards, and a sample that is too short
+// is at the mercy of single scheduler events: on this machine a point measured in
+// ~0.1 ms came out bimodal, its median jumping between two states, while the same
+// point batched into milliseconds held to a few percent.
+//
+// The choice is then confirmed on real samples and raised if the observed duration
+// falls short, because even a median-based estimate can be optimistic when the
+// distribution is wide.
+template < typename Setup, typename Work >
+Calibration calibrate( const RunConfig& config, Setup&& setup, Work&& work ) {
+  Calibration result;
+
+  {
+    std::vector< double > trials;
+    trials.reserve( 7 );
+    for ( int t = 0; t < 7; ++t ) {
+      trials.push_back( time_once_ms( work ) );
+    }
+    std::sort( trials.begin(), trials.end() );
+    result.typical_ms = trials[ trials.size() / 2 ];
+  }
+
+  result.repeat = config.scale;
+  for ( int attempt = 0; attempt < 6; ++attempt ) {
+    result.attempts = attempt + 1;
+
+    while ( result.typical_ms * static_cast< double >( result.repeat ) < config.min_sample_ms &&
+            result.repeat < config.max_scale ) {
+      result.repeat *= 2;
+    }
+
+    // Confirm on real samples; the median of three again, since a single run is
+    // exactly what cannot be trusted here.
+    setup();
+    std::vector< double > confirm;
+    for ( int c = 0; c < 3; ++c ) {
+      confirm.push_back( time_once_ms( [ & ] {
+        for ( int r = 0; r < result.repeat; ++r ) {
+          work();
+        }
+      } ) );
+    }
+    std::sort( confirm.begin(), confirm.end() );
+
+    if ( confirm[ 1 ] >= config.min_sample_ms || result.repeat >= config.max_scale ) {
+      break;
+    }
+
+    // Still too short: scale in proportion to what was actually observed.
+    const double measured = confirm[ 1 ] > 0.0 ? confirm[ 1 ] : config.min_sample_ms;
+    int next =
+      static_cast< int >( static_cast< double >( result.repeat ) * ( config.min_sample_ms / measured ) * 1.3 ) + 1;
+    if ( next <= result.repeat ) {
+      next = result.repeat + 1;
+    }
+    result.repeat = next < config.max_scale ? next : config.max_scale;
+  }
+
+  return result;
+}
+
+// Runs `work` once and returns its duration in milliseconds, accumulating the
+// cycle count into last_cycles(). The value the work produced is fed to the
+// checksum by the caller, which is what stops it from being discarded.
 template < typename F >
 double time_once_ms( F&& work ) {
   const auto start = std::chrono::steady_clock::now();
+  const uint64_t start_cycles = read_cycles();
   work();
+  const uint64_t end_cycles = read_cycles();
   const auto finish = std::chrono::steady_clock::now();
   clobber_memory();
+
+  last_cycles() += static_cast< uint64_t >( end_cycles > start_cycles ? end_cycles - start_cycles : 0 );
   return std::chrono::duration< double, std::milli >( finish - start ).count();
 }
 
@@ -491,50 +671,8 @@ Stats measure( const RunConfig& config, const size_t units, Setup&& setup, Work&
   const int warmup = units >= 1000000u ? config.bulk_warmup : config.warmup;
   const int samples = units >= config.large_threshold ? config.large_samples : config.samples;
 
-  // The cost of a single repetition, taken as the median of several so that one
-  // outlier cannot set the size of every sample.
-  double typical_ms = 0.0;
-  {
-    std::vector< double > trials;
-    trials.reserve( 7 );
-    for ( int t = 0; t < 7; ++t ) {
-      trials.push_back( time_once_ms( work ) );
-    }
-    std::sort( trials.begin(), trials.end() );
-    typical_ms = trials[ trials.size() / 2 ];
-  }
-
-  int repeat = config.scale;
-  for ( int attempt = 0; attempt < 6; ++attempt ) {
-    while ( typical_ms * static_cast< double >( repeat ) < config.min_sample_ms && repeat < config.max_scale ) {
-      repeat *= 2;
-    }
-
-    // Confirm on real samples; the median of three again, since a single run is
-    // exactly what cannot be trusted here.
-    setup();
-    std::vector< double > confirm;
-    for ( int c = 0; c < 3; ++c ) {
-      confirm.push_back( time_once_ms( [ & ] {
-        for ( int r = 0; r < repeat; ++r ) {
-          work();
-        }
-      } ) );
-    }
-    std::sort( confirm.begin(), confirm.end() );
-
-    if ( confirm[ 1 ] >= config.min_sample_ms || repeat >= config.max_scale ) {
-      break;
-    }
-
-    // Still too short: scale in proportion to what was actually observed.
-    const double measured = confirm[ 1 ] > 0.0 ? confirm[ 1 ] : config.min_sample_ms;
-    int next = static_cast< int >( static_cast< double >( repeat ) * ( config.min_sample_ms / measured ) * 1.3 ) + 1;
-    if ( next <= repeat ) {
-      next = repeat + 1;
-    }
-    repeat = next < config.max_scale ? next : config.max_scale;
-  }
+  const Calibration calibration = calibrate( config, setup, work );
+  const int repeat = calibration.repeat;
 
   for ( int i = 0; i < warmup; ++i ) {
     setup();
@@ -546,6 +684,8 @@ Stats measure( const RunConfig& config, const size_t units, Setup&& setup, Work&
   std::vector< double > durations;
   durations.reserve( static_cast< size_t >( samples ) );
 
+  const uint64_t cycles_before = last_cycles();
+
   for ( int i = 0; i < samples; ++i ) {
     setup();
     durations.push_back( time_once_ms( [ & ] {
@@ -555,8 +695,15 @@ Stats measure( const RunConfig& config, const size_t units, Setup&& setup, Work&
     } ) );
   }
 
-  Stats stats = summarise( durations, units * static_cast< size_t >( repeat ) );
+  const uint64_t cycles_taken = last_cycles() - cycles_before;
+  const size_t total_units = units * static_cast< size_t >( repeat );
+
+  Stats stats = summarise( durations, total_units );
   stats.repeat = repeat;
+  if ( cycles_taken != 0 && total_units != 0 ) {
+    stats.per_unit_cycles = static_cast< double >( cycles_taken ) / static_cast< double >( total_units );
+  }
+
   return stats;
 }
 
@@ -578,6 +725,11 @@ inline void print_result( const Result& result ) {
     result.stats.spread_pct,
     result.stats.spread_pct > 10.0 ? "  <- noisy" : ""
   );
+  if ( result.stats.per_unit_cycles > 0.0 ) {
+    // Cycles per unit and the coefficient of variation, on their own line so that
+    // the main line stays readable at this width.
+    std::printf( "%-60s cycles/unit=%7.2f  cv=%5.1f%%\n", "", result.stats.per_unit_cycles, result.stats.cv_pct );
+  }
   if ( !result.notes.empty() ) {
     std::printf( "%38s note: %s\n", "", result.notes.c_str() );
   }
@@ -593,6 +745,37 @@ inline uint64_t& checksum() {
 
 inline void mix_into_checksum( const uint64_t value ) {
   checksum() ^= value + 0x9e3779b97f4a7c15ull + ( checksum() << 6 ) + ( checksum() >> 2 );
+}
+
+// Writes the raw samples of every point, next to the summary CSV.
+inline void
+write_samples_file( const std::string& csv_path, const RunContext& context, const std::vector< Result >& results ) {
+  if ( csv_path.empty() ) {
+    return;
+  }
+
+  const std::string samples_path = csv_path + ".samples.csv";
+  const bool needs_header = !file_exists( samples_path );
+
+  if ( std::FILE* out = open_for_append( samples_path ) ) {
+    if ( needs_header ) {
+      print_samples_header( out );
+    }
+    for ( const auto& result : results ) {
+      print_samples( out, context, result );
+    }
+    std::fclose( out );
+    std::printf( "# raw samples written to %s\n", samples_path.c_str() );
+  }
+}
+
+// Explains a point whose spread is too wide to draw a conclusion from. The
+// overwhelmingly common cause is first-touch: the first timed run walks pages
+// that have never been resident, and averages that cost into the median.
+inline void print_spread_hint( const double spread_pct ) {
+  if ( spread_pct > 15.0 ) {
+    std::printf( "%38s hint: wide spread usually means first-touch pages; check the warmup\n", "" );
+  }
 }
 
 } // namespace bench
