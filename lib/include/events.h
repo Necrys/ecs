@@ -7,9 +7,24 @@ namespace ecs {
 struct events {};
 class registry;
 
+namespace detail {
+
+// Whether the system that subscribed is still there and enabled. Declared here and
+// defined in lib/src/events.cpp, where registry.h is available: the handler has to
+// ask the registry, and going through a free function keeps this header free of
+// registry.h - which it could not include anyway, since registry.h includes this
+// one. The call sits in a template, so the dependency stays where it belongs, at the
+// instantiation rather than at the include.
+bool system_is_active( const registry& r, const size_t sid );
+
+} // namespace detail
+
 class event_handler_base {
 public:
-  virtual ~event_handler_base() = default;
+  // Out of line for the same reason as the other polymorphic bases: one home for
+  // the vtable rather than a weak copy per translation unit.
+  virtual ~event_handler_base();
+
   virtual void handle_all() = 0;
 };
 
