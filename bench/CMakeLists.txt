@@ -12,7 +12,6 @@
 
 if ( MSVC )
   set ( ECS_BENCH_OPT_FLAGS /O2 /Ob2 /DNDEBUG )
-  set ( ECS_BENCH_WARN_FLAGS /W3 )
 
   # Address space layout randomisation is a documented source of unreproducible
   # noise, and the mechanism fits what was observed here: within one process the
@@ -25,7 +24,6 @@ if ( MSVC )
   set ( ECS_BENCH_LINK_FLAGS /DYNAMICBASE:NO )
 elseif ( CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang" )
   set ( ECS_BENCH_OPT_FLAGS -O2 -DNDEBUG )
-  set ( ECS_BENCH_WARN_FLAGS -Wall -Wextra )
 else ()
   message ( FATAL_ERROR "Unsupported compiler for benchmarks: ${CMAKE_CXX_COMPILER_ID}" )
 endif ()
@@ -40,8 +38,9 @@ foreach ( bench ${benchmarks} )
   string ( REPLACE "bench_" "" source_name ${bench} )
   add_executable ( ${bench} ${source_name}.cpp keep_alive.cpp )
   target_link_libraries ( ${bench} PRIVATE ecs )
-  target_compile_options ( ${bench} PRIVATE ${ECS_BENCH_OPT_FLAGS} ${ECS_BENCH_WARN_FLAGS} )
+  target_compile_options ( ${bench} PRIVATE ${ECS_BENCH_OPT_FLAGS} )
   target_link_options ( ${bench} PRIVATE ${ECS_BENCH_LINK_FLAGS} )
+  ecs_set_warnings ( ${bench} )
 
   # Benchmarks are never tests: running them belongs to a deliberate, local
   # decision, not to a test run.

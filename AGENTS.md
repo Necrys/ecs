@@ -171,6 +171,8 @@ ecs/
 |   |-- events.h/.hpp          event queues
 |   `-- type_enumerator.h      assigns ids to component/system/event types
 |-- src/                   non-template .cpp implementations
+|-- cmake/                 build modules (warning configuration)
+|-- check/                 the public headers compiled as their own unit
 |-- tests/                 unit tests (Catch2)
 |-- bench/                 benchmarks (off by default, see bench/README.md)
 `-- tools/                 helper scripts (formatting)
@@ -187,6 +189,15 @@ code should be laid out the same way.
 The library is static and has no external dependencies. It is built as C++17:
 Catch2 v3, which the tests use, requires at least C++14, and the standard was
 moved straight to 17 to avoid a second migration.
+
+Warnings are part of the build, not an optional extra: `cmake/CompilerWarnings.cmake`
+gives every target the same set (`/W4 /permissive-` on MSVC, `-Wall -Wextra
+-Wconversion -Wsign-conversion` and the rest on GCC and Clang, plus `-Weverything`
+under Clang), and `ECS_WARNINGS_AS_ERRORS` (on by default) turns them into errors.
+`check/headers.cpp` compiles the public headers as their own translation unit and
+instantiates the template surface, so a warning in a header is not hidden until
+somebody uses that combination. Turn the option off only to see the whole list at
+once, e.g. `-DECS_WARNINGS_AS_ERRORS=OFF`.
 
 The tests pull Catch2 through `FetchContent`, pinned to an exact commit of
 v3.16.1 (see `tests/CMakeLists.txt`), so the dependency cannot shift under us.

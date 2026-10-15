@@ -32,6 +32,20 @@ FetchContent_Declare ( catchorg_catch2
 
 FetchContent_MakeAvailable ( catchorg_catch2 )
 
+# Catch2 is a dependency, not code under review: its headers must not be judged
+# by our warning set, which under clang is -Weverything. Marking its include
+# directories as system keeps the warnings on our own code.
+foreach ( catch2_target Catch2 Catch2WithMain Catch2_buildall_interface )
+  if ( TARGET ${catch2_target} )
+    get_target_property ( catch2_includes ${catch2_target} INTERFACE_INCLUDE_DIRECTORIES )
+    if ( catch2_includes )
+      set_target_properties ( ${catch2_target}
+        PROPERTIES INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${catch2_includes}"
+      )
+    endif()
+  endif()
+endforeach()
+
 # -----------------------------------------------------------------------------
 # Test targets
 #
@@ -55,11 +69,9 @@ foreach ( target ${tests} )
       Catch2::Catch2WithMain
   )
 
+  ecs_set_warnings ( ${target} )
+
   if ( CMAKE_CXX_COMPILER_ID MATCHES "MSVC" )
-    target_compile_options ( ${target}
-      PRIVATE
-        /W3
-    )
     target_compile_definitions ( ${target}
       PRIVATE
         # Iterator debugging is a Debug-only facility of the MSVC standard
@@ -67,19 +79,6 @@ foreach ( target ${tests} )
         # library keeps assert() enabled on its own, so the tests still exercise
         # the internal checks that matter.
         $<$<CONFIG:Debug>:_HAS_ITERATOR_DEBUGGING=1>
-    )
-  elseif ( CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang" )
-    target_compile_options ( ${target}
-      PRIVATE
-        -Wpedantic
-        -pedantic-errors
-        -Wextra
-        -Wall
-        -Winit-self
-        -Wold-style-cast
-        -Woverloaded-virtual
-        -Wuninitialized
-        -Wmissing-declarations
     )
   endif ()
 
