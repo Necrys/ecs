@@ -1,0 +1,8 @@
+# One line ending everywhere.
+#
+# This is not cosmetic: clang-format rewrites CRLF to LF, so with mixed endings the
+# formatter's verdict depended on the platform the repository was checked out on -
+# green on Windows, red on Linux, for the same commit. The formatter now states LF
+# explicitly (see .clang-format), and git stores and checks out LF so that the two
+# agree.
+* text=auto eol=lf

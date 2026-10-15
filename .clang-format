@@ -17,6 +17,12 @@ Language: Cpp
 BasedOnStyle: LLVM
 Standard: c++17
 
+# LF, stated rather than derived. Deriving it from the file makes the verdict
+# depend on how the repository was checked out: the same commit passed on Windows
+# and failed on Linux while the tree held both kinds of ending. .gitattributes keeps
+# git in step with this.
+LineEnding: LF
+
 # ---------------------------------------------------------------------------
 # Indentation
 # ---------------------------------------------------------------------------
