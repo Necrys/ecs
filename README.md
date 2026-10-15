@@ -56,12 +56,17 @@ Verified configurations:
 |---|---|---|
 | Windows x64 | MSVC 19.38 (VS 2022) | builds |
 | Windows x64 | Clang (`clang-cl`), Clang (GNU mode) | builds |
+| Raspberry Pi 1 (ARMv6, Raspbian 13) | GCC 14.2 | builds, tests pass |
+| Raspberry Pi 2 (ARMv7, Raspbian 13) | GCC 14.2 | builds |
 | Linux x64 | GCC, Clang | target platform, build not verified yet |
-| Raspberry Pi 1/2 (ARMv6/ARMv7) | GCC | target platform, build not verified yet |
 
 MinGW-w64 and macOS are not on the list: there is no tooling available to build
 and check them, and claiming unverified support is meaningless. They will be
 added once it becomes possible to build and test on them, including through CI.
+
+The two Raspberry Pi entries differ because the verification does: the whole test
+suite passes on the Pi 1, while on the Pi 2 only the library build has been
+checked so far.
 
 ```bash
 # Linux / Raspberry Pi
