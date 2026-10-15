@@ -26,10 +26,10 @@ subscribe to events and declare dependencies between each other.
 Configurations verified against the current code: MSVC (VS 2022), Clang in MSVC
 mode (`clang-cl`) and Clang in GNU mode, all on Windows x64; GCC 14.2 on both
 Raspberry Pi 1 (ARMv6) and Pi 2 (ARMv7), where the library builds, the header
-check compiles and the full test suite passes. Linux x64 remains a target
-platform that has not been verified. MinGW-w64 and macOS are currently out of
-scope: there is no way to build or check them, and claiming unverified support is
-meaningless.
+check compiles and the full test suite passes; and Linux x64 with GCC 14 and
+Clang 22, which is what the CI runs build and test on every push. MinGW-w64 and
+macOS are currently out of scope: there is no way to build or check them, and
+claiming unverified support is meaningless.
 
 The library is provided as is: this is a non-commercial hobby project and you
 use it at your own risk. The license is the Unlicense (public domain), with no
@@ -221,8 +221,14 @@ gives every target the same set (`/W4 /permissive-` on MSVC, `-Wall -Wextra
 under Clang), and `ECS_WARNINGS_AS_ERRORS` (on by default) turns them into errors.
 `tests/check/headers.cpp` compiles the public headers as their own translation unit
 and instantiates the template surface, so a warning in a header is not hidden until
-somebody uses that combination. Turn the option off only to see the whole list at
-once, e.g. `-DECS_WARNINGS_AS_ERRORS=OFF`.
+somebody uses that combination. Beside it, the `ecs_headers_standalone` object
+library compiles one generated unit per public header, each including exactly one
+header by the name a user writes: a header that only works when others are included
+first fails there, which is how `events.h` was found to need the full registry type.
+Only the `.h` halves are checked - a `.hpp` is the implementation half its `.h`
+pulls in, and on its own it is not meant to compile. A new header is picked up by
+the glob, so no list has to be maintained. Turn the option off only to see the whole
+list at once, e.g. `-DECS_WARNINGS_AS_ERRORS=OFF`.
 
 The tests pull Catch2 through `FetchContent`, pinned to an exact commit of
 v3.16.1 (see `tests/CMakeLists.txt`), so the dependency cannot shift under us.
