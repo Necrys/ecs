@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
     Formats or checks the ecs sources with clang-format.
 
@@ -19,6 +19,11 @@
 
 .PARAMETER Staged
     Restrict to files staged in git. Handy before a commit.
+
+.PARAMETER AnyVersion
+    Accept a clang-format whose major version differs from the pinned one. The
+    verdict differs between majors, so this is for machines where the pinned
+    version is not installed; it prints a warning.
 
 .PARAMETER Paths
     Explicit files or directories to process, relative to the repository root or
@@ -51,6 +56,7 @@ param(
     [switch] $Check,
     [switch] $List,
     [switch] $Staged,
+    [switch] $AnyVersion,
     [Alias('Path')]
     [string[]] $Paths
 )
@@ -147,6 +153,7 @@ $arguments = @($script)
 if ( $Check ) { $arguments += '--check' }
 if ( $List ) { $arguments += '--list' }
 if ( $Staged ) { $arguments += '--staged' }
+if ( $AnyVersion ) { $arguments += '--any-version' }
 if ( $resolvedPaths.Count -gt 0 ) {
     $arguments += '--files'
     $arguments += $resolvedPaths

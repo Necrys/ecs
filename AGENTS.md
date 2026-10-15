@@ -218,7 +218,7 @@ ordinary shell. Everything is also reachable by hand:
 
 | What | How |
 |---|---|
-| Formatting | `python tools/format.py --check` (all files) or `--staged` (what is about to be committed) |
+| Formatting | `python tools/format.py --check` (all files) or `--staged` (what is about to be committed); clang-format 22 is pinned, `--any-version` overrides it with a warning |
 | Warnings | `-DECS_WARNINGS_AS_ERRORS=ON` is the default; `OFF` prints the whole list instead of stopping |
 | Sanitizers | `cmake --preset msvc-asan` on Windows. Elsewhere `-DECS_ENABLE_ASAN=ON -DECS_ENABLE_UBSAN=ON`; `ECS_ENABLE_TSAN` exists for the day there are threads |
 | clang-tidy | `cmake --preset tidy` produces a compile database, then `clang-tidy -p build/tidy <file>`; the checks and the reasons for what is off are in `.clang-tidy` |

@@ -5,25 +5,37 @@ This is intentionally dependency-free: it needs only a clang-format binary and
 locates one itself, preferring the copy shipped with the compiler toolchain
 (MSVC/LLVM on Windows, the system clang on Linux) over anything on PATH.
 
+The major version is pinned (see REQUIRED_MAJOR below). clang-format makes
+different line-breaking decisions between releases, so a verdict from another
+major is not the verdict this repository was formatted with: a file would be
+reported as needing formatting, and reformatting with that version would put the
+file back out of step with the pinned one.
+
 Usage
 -----
-    python tools/format.py            # reformat files in place
-    python tools/format.py --check    # report files that are not formatted
-    python tools/format.py --list     # just list the files that would be handled
-    python tools/format.py --staged   # only files staged in git
+    python tools/format.py                  # reformat files in place
+    python tools/format.py --check          # report files that are not formatted
+    python tools/format.py --list           # just list the files that would be handled
+    python tools/format.py --staged         # only files staged in git
+    python tools/format.py --any-version    # accept another clang-format major
 
 Exit codes: 0 = ok, 1 = check failed (files need formatting), 2 = environment
-problem (no clang-format found, git missing, ...).
+problem (no clang-format, wrong major, git missing, ...).
 """
 
 from __future__ import annotations
 
 import argparse
 import os
+import re
 import shutil
 import subprocess
 import sys
 from pathlib import Path
+
+# The version the tree is formatted with. Raising this means reformatting the
+# whole tree in the same commit that raises it, or every file fails the check.
+REQUIRED_MAJOR = 22
 
 # Directories that never contain library sources.
 SKIP_DIRS = {
@@ -45,17 +57,16 @@ SOURCE_SUFFIXES = {".h", ".hpp", ".hxx", ".cpp", ".cxx", ".cc"}
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
-def find_clang_format() -> str | None:
-    """Locate a clang-format binary, preferring toolchain-bundled copies.
+def clang_format_candidates() -> list[str]:
+    """Every clang-format worth trying, in the order they should be preferred.
 
-    Visual Studio ships one binary per target architecture under
-    VC/Tools/Llvm/<arch>/bin. The host-architecture copy is preferred because a
-    cross-target binary (for example x86 on an x64 host) will be found first
-    alphabetically and then fail to launch.
+    An explicit CLANG_FORMAT comes first and is then honoured on its own: the
+    user pointed at that binary, so a mismatch is reported rather than quietly
+    replaced with another one.
     """
     override = os.environ.get("CLANG_FORMAT")
     if override:
-        return override if Path(override).exists() else None
+        return [override] if Path(override).exists() else []
 
     import glob
     import platform
@@ -85,14 +96,73 @@ def find_clang_format() -> str | None:
         "/opt/homebrew/opt/llvm/bin/clang-format",
         "/usr/local/opt/llvm/bin/clang-format",
     ]
+
+    candidates: list[str] = []
     for pattern in patterns:
         for match in sorted(glob.glob(pattern)):
-            if Path(match).is_file():
-                return match
+            if Path(match).is_file() and match not in candidates:
+                candidates.append(match)
 
     # Only fall back to PATH after the toolchain locations were considered, so
     # that a stale system-wide install does not shadow the compiler's own copy.
-    return shutil.which("clang-format")
+    on_path = shutil.which("clang-format")
+    if on_path and on_path not in candidates:
+        candidates.append(on_path)
+
+    return candidates
+
+
+def clang_format_version(binary: str) -> str | None:
+    """The `--version` line of a binary, or None when it will not run."""
+    try:
+        result = subprocess.run([binary, "--version"], capture_output=True, text=True, check=False)
+    except OSError:
+        return None
+
+    text = (result.stdout or result.stderr or "").strip()
+    return text or None
+
+
+def major_of(version: str | None) -> int | None:
+    if not version:
+        return None
+
+    match = re.search(r"(\d+)\.(\d+)\.(\d+)", version)
+    return int(match.group(1)) if match else None
+
+
+def choose_clang_format(any_version: bool) -> tuple[str | None, str | None, str | None]:
+    """Pick the binary to use.
+
+    Returns (binary, version, error). A binary of the pinned major is preferred
+    among the candidates; when none matches, the caller gets the best candidate
+    and its version so that the message can name both.
+    """
+    override = os.environ.get("CLANG_FORMAT")
+    candidates = clang_format_candidates()
+
+    if not candidates:
+        return None, None, None
+
+    if override:
+        # The user was explicit: use it or explain why it cannot be used.
+        version = clang_format_version(override)
+        if major_of(version) == REQUIRED_MAJOR or any_version:
+            return override, version, None
+        return None, None, f"{override} is {version or 'not runnable'}"
+
+    first_version = None
+    for candidate in candidates:
+        version = clang_format_version(candidate)
+        if first_version is None:
+            first_version = version
+        if major_of(version) == REQUIRED_MAJOR:
+            return candidate, version, None
+
+    if any_version:
+        return candidates[0], first_version, None
+
+    return None, None, f"{candidates[0]} is {first_version or 'not runnable'}"
 
 
 def git_available() -> bool:
@@ -193,6 +263,11 @@ def main() -> int:
     parser.add_argument("--staged", action="store_true", help="restrict to files staged in git")
     parser.add_argument("--verbose", action="store_true", help="print the clang-format command line")
     parser.add_argument(
+        "--any-version",
+        action="store_true",
+        help=f"accept a clang-format other than {REQUIRED_MAJOR}.x (the verdict may differ)",
+    )
+    parser.add_argument(
         "--files",
         nargs="+",
         metavar="PATH",
@@ -200,7 +275,19 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    clang_format = find_clang_format()
+    clang_format, version, mismatch = choose_clang_format(args.any_version)
+
+    if clang_format is None and mismatch:
+        print(
+            f"error: clang-format {REQUIRED_MAJOR}.x is required, but {mismatch}.\n"
+            f"  The sources are formatted with {REQUIRED_MAJOR}; other majors break lines differently,\n"
+            "  so their verdict is not the one this repository was formatted with.\n"
+            f"  Install LLVM {REQUIRED_MAJOR}, or point CLANG_FORMAT at a {REQUIRED_MAJOR}.x binary.\n"
+            "  Deliberately formatting with another version: --any-version.",
+            file=sys.stderr,
+        )
+        return 2
+
     if not clang_format:
         print(
             "error: clang-format not found.\n"
@@ -209,6 +296,9 @@ def main() -> int:
             file=sys.stderr,
         )
         return 2
+
+    if args.any_version and major_of(version) != REQUIRED_MAJOR:
+        print(f"warning: using {clang_format} ({version}); this is not {REQUIRED_MAJOR}.x", file=sys.stderr)
 
     files = collect_files(args.staged, args.files)
     if args.list:
@@ -221,7 +311,6 @@ def main() -> int:
         print("nothing to do")
         return 0
 
-    version = subprocess.run([clang_format, "--version"], capture_output=True, text=True).stdout.strip()
     print(f"using {clang_format} ({version})")
     print(f"{'checking' if args.check else 'formatting'} {len(files)} file(s)")
 

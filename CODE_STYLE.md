@@ -73,9 +73,16 @@ Notes:
 
 ## 3. Formatting
 
-Enforced by `.clang-format` (verified with clang-format 19 and 22; the results
-are identical apart from one line break). The key traits, so it is clear why the
-code looks the way it does:
+Enforced by `.clang-format`. **The major version is pinned to 22**: the tool
+refuses another major instead of reporting a verdict the repository was not
+formatted with. The earlier claim that 19 and 22 differ by a single line break is
+wrong, and was measured: 19.1.5 wants changes in `bench/harness.hpp`,
+`bench/machine.hpp`, `include/selection.hpp` and `include/sparse_vector.hpp` -
+where a line is broken, not what the code does. On a machine that has no 22,
+`tools/format.py --any-version` runs anyway and warns; the pinned version is what
+`tools/check.ps1` uses.
+
+The key traits, so it is clear why the code looks the way it does:
 
 - **2-space** indentation, no tabs;
 - the opening brace stays **on the same line** - for functions and for classes;
@@ -93,7 +100,6 @@ Two tool limitations are worth knowing:
   the option was removed from clang-format in v19;
 - `SECTION` blocks in tests are formatted as ordinary nested blocks and get
   indented, even though historically they sat at column zero.
-
 Tests use Catch2 v3 (`<catch2/catch_test_macros.hpp>`). The test runner is
 provided by the `Catch2WithMain` target, so test sources must not define
 `CATCH_CONFIG_MAIN` and must not provide their own `main`.
