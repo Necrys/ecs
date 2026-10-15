@@ -52,15 +52,17 @@ jobs:
       # repository has 22 for noble, and its bin directory holds unversioned names,
       # which is what the scripts look for.
       #
-      # llvm.sh installs the compiler, clang-format, clang-tidy, the compiler-rt
-      # runtimes and llvm-22-dev and llvm-22-tools - but not llvm-22 itself, which is
-      # the package holding llvm-cov and llvm-profdata. Coverage needs both.
+      # llvm.sh only adds the repository and installs clang, lldb, lld and clangd -
+      # the rest of its list needs the "all" argument. The packages this project
+      # actually runs are named here instead, including llvm-22 (llvm-cov and
+      # llvm-profdata live in it) and clang-format-22 (the formatter the project
+      # pins; without it the image's clang-format 18 is found and refused).
       - name: Install LLVM 22
         run: |
           wget -q https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
           sudo ./llvm.sh 22
-          sudo apt-get install -y llvm-22
+          sudo apt-get install -y clang-22 clang-tidy-22 clang-format-22 llvm-22 libclang-rt-22-dev
           echo "/usr/lib/llvm-22/bin" >> "$GITHUB_PATH"
 
       - name: Tools in use
