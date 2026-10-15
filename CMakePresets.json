@@ -22,7 +22,11 @@
       "displayName": "MSVC (Release)",
       "description": "Default toolchain on Windows. Benchmarks build with /O2 pinned in tests/bench/CMakeLists.txt.",
       "inherits": "base",
-      "generator": "Ninja"
+      "generator": "Ninja",
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "cl",
+        "CMAKE_CXX_COMPILER": "cl"
+      }
     },
     {
       "name": "clang-cl",
@@ -106,12 +110,14 @@
     },
     {
       "name": "tests-only",
-      "displayName": "Tests only (no benchmarks)",
-      "description": "The configuration used for ordinary development and for the test suite.",
+      "displayName": "MSVC, tests only (Debug, no benchmarks)",
+      "description": "The configuration used for ordinary development on Windows and by the Windows CI job. The compiler is pinned: a runner with MinGW on PATH otherwise configures a GNU build that is not what this preset - or the job using it - claims. Linux uses linux-clang or linux-gcc, which pin their own.",
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/build/${presetName}",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_C_COMPILER": "cl",
+        "CMAKE_CXX_COMPILER": "cl",
         "ECS_BUILD_TESTS": "ON",
         "ECS_BUILD_BENCHMARKS": "OFF"
       }

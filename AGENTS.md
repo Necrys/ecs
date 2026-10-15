@@ -197,7 +197,15 @@ describe how the project is built and checked, not what the library contains.
 itself: GitHub looks for workflows in that path and nowhere else. It builds and
 tests the library on Linux (clang 22 and GCC 14) and Windows (MSVC), publishes the
 reports as run artefacts, and leaves the Raspberry Pi boards to the local, manual
-procedure they already have.
+procedure they already have. Every job asserts which compiler its configuration
+picked: the presets pin one, and a machine with several compilers on `PATH` would
+otherwise build something the job name does not mention.
+
+The presets name their toolchain, and the platform decides which names exist:
+`tests-only` and `msvc` pin MSVC, `linux-clang` and `linux-gcc` pin theirs,
+`coverage`/`tidy` pin clang-cl on Windows and `linux-coverage`/`linux-tidy` pin
+clang elsewhere. `tools/check.py` and `tools/coverage.py` pick the right preset for
+the platform on their own.
 
 ---
 

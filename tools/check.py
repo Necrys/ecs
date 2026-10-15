@@ -18,7 +18,7 @@ Usage
 
 Options
 -------
-    --preset NAME     configure/build preset (default: tests-only)
+    --preset NAME     configure/build preset (default: tests-only on Windows, linux-gcc elsewhere)
     --sanitizers      also build and run the sanitizer configuration
     --tidy            also run clang-tidy over the library, the header check and the tests
     --full            --sanitizers and --tidy
@@ -47,6 +47,10 @@ SYSTEMS = {0: "ok", 1: "check failed", 2: "environment problem"}
 # The compile-database configuration differs per platform only in the compiler
 # driver: clang-cl on Windows, clang elsewhere. See tools/CMakePresets.json.
 TIDY_PRESET = "tidy" if os.name == "nt" else "linux-tidy"
+
+# Likewise for the ordinary build: the preset is named for the toolchain, and the
+# toolchain is a property of the platform.
+DEFAULT_PRESET = "tests-only" if os.name == "nt" else "linux-gcc"
 
 if os.name == "nt":
     # CTest sometimes loses characters through the legacy console code page, and
@@ -387,7 +391,8 @@ def step_tidy(shell: Shell) -> bool:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run the checks a commit is expected to pass.")
-    parser.add_argument("--preset", default="tests-only", help="configure/build preset (default: tests-only)")
+    parser.add_argument("--preset", default=DEFAULT_PRESET,
+                        help=f"configure/build preset (default: {DEFAULT_PRESET})")
     parser.add_argument("--sanitizers", action="store_true", help="also run the sanitizer configuration")
     parser.add_argument("--tidy", action="store_true", help="also run clang-tidy")
     parser.add_argument("--full", action="store_true", help="--sanitizers and --tidy")

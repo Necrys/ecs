@@ -99,9 +99,11 @@ and `windows-2025`:
 | Windows, MSVC | the suite in Debug, and again under AddressSanitizer |
 
 The toolchains are installed to match what the project pins rather than taken from
-the image, so a run here and a run locally look at the same tools. The Raspberry Pi
-boards are deliberately absent: no hosted runner has ARMv6 or ARMv7 hardware, and
-their builds and measurements stay local and manual.
+the image, so a run here and a run locally look at the same tools - and each job
+checks which compiler its configuration actually picked, because a runner with
+several of them on `PATH` will otherwise build something the job name does not
+mention. The Raspberry Pi boards are deliberately absent: no hosted runner has
+ARMv6 or ARMv7 hardware, and their builds and measurements stay local and manual.
 
 Every report is published as an artefact of the run - JUnit XML, the merged lcov
 tracefile, the HTML coverage report - and the run page carries a summary with the

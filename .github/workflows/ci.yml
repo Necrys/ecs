@@ -84,6 +84,15 @@ jobs:
             --uncovered \
             --summary summary-linux-clang.md
 
+      # The job says "clang 22", so it checks that this is what the configuration
+      # actually picked. A runner with several compilers on PATH otherwise builds
+      # something else and the job name quietly becomes a lie.
+      - name: Assert the compiler is clang 22
+        run: |
+          grep -E '^CMAKE_CXX_COMPILER:' build/linux-coverage/CMakeCache.txt
+          grep -q 'llvm-22' build/linux-coverage/CMakeCache.txt || {
+            echo "the coverage build did not use LLVM 22" >&2; exit 1; }
+
       # Release is not a repeat of the Debug run above: the optimiser inlines
       # differently, the standard library's own checks are gone, and -Werror sees
       # different code. This is also the configuration the benchmarks measure.
@@ -143,6 +152,12 @@ jobs:
           cmake --build build/gcc-debug --parallel
           ctest --test-dir build/gcc-debug --output-on-failure --output-junit junit-gcc-debug.xml
 
+      - name: Assert the compiler is GCC 14
+        run: |
+          grep -E '^CMAKE_CXX_COMPILER:' build/gcc-debug/CMakeCache.txt
+          grep -q 'g++-14' build/gcc-debug/CMakeCache.txt || {
+            echo "the Debug build did not use g++-14" >&2; exit 1; }
+
       # AddressSanitizer plus UndefinedBehaviorSanitizer, and on Linux this includes
       # leak detection, which the MSVC runtime does not do - so this is the job that
       # would notice a page nobody frees.
@@ -193,6 +208,18 @@ jobs:
       # records.
       - name: Build, test, and run under ASan
         run: python tools/check.py --no-format --sanitizers
+
+      # The first run of this job built with MinGW: the runner has it on PATH, the
+      # presets did not pin a compiler, and the name of the job said MSVC. Now they
+      # do pin one, and this checks that the pin bit.
+      - name: Assert the compiler is MSVC
+        shell: bash
+        run: |
+          grep -E '^CMAKE_CXX_COMPILER:' build/tests-only/CMakeCache.txt build/msvc-asan/CMakeCache.txt
+          grep -qi 'cl\.exe' build/tests-only/CMakeCache.txt || {
+            echo "the Debug build is not MSVC" >&2; exit 1; }
+          grep -qi 'cl\.exe' build/msvc-asan/CMakeCache.txt || {
+            echo "the ASan build is not MSVC" >&2; exit 1; }
 
       - name: Summary
         if: always()
