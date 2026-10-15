@@ -13,7 +13,7 @@ difference deliberate rather than accidental.
 ## Building
 
 Benchmarks are off by default. They build with optimisation pinned per compiler
-inside `bench/CMakeLists.txt` (`/O2` for MSVC, `-O2` otherwise) rather than
+inside `tests/bench/CMakeLists.txt` (`/O2` for MSVC, `-O2` otherwise) rather than
 inheriting `CMAKE_BUILD_TYPE`, so a run cannot silently happen against a debug
 build.
 
@@ -32,9 +32,9 @@ cmake --preset gcc
 cmake --build --preset gcc
 ```
 
-Binaries land in `build/<preset>/bench/`. Run each compiler separately: the point
-of having several presets is to compare code generation, and mixing results from
-two compilers in one history ruins that.
+Binaries land in `build/<preset>/tests/bench/`. Run each compiler separately: the
+point of having several presets is to compare code generation, and mixing results
+from two compilers in one history ruins that.
 
 Nothing here is registered with CTest. Benchmarks are not tests: they are slow,
 their results are machine-specific, and a pass/fail verdict on them would be

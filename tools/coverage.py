@@ -2,8 +2,8 @@
 """Measure how much of the library the tests actually execute.
 
 Coverage is source-based: the tests are built instrumented by clang
-(cmake/Coverage.cmake), each run writes a raw profile, and llvm-cov turns the
-merged profile into lcov records.
+(tools/cmake/Coverage.cmake), each run writes a raw profile, and llvm-cov turns
+the merged profile into lcov records.
 
 Why the lcov route: llvm-cov cannot union independent executables that each
 contain the library. Asked to report several of them at once it keeps the files
@@ -52,7 +52,7 @@ PRESET = "coverage"
 BUILD_DIR = REPO_ROOT / "build" / PRESET
 
 # Nothing under these paths is ours to be measured by the library's number.
-EXCLUDE_PATTERN = r"(^|[\\/])(tests|bench|check|build|_deps)[\\/]"
+EXCLUDE_PATTERN = r"(^|[\\/])(tests|build|_deps)[\\/]"
 
 # The floor, measured rather than chosen: the numbers are the first full run on
 # 15.10.2026 after the dependency machinery and the const accessors were covered,

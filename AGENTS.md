@@ -153,34 +153,45 @@ architectural area, make sure it is not marked as pending replacement.
 
 ## Repository layout
 
+Three directories, one purpose each: the library, the material that verifies it,
+and the scripts that drive both.
+
 ```
 ecs/
 |-- .clang-format          formatting rules (verified, idempotent)
-|-- CMakeLists.txt         library build
+|-- CMakeLists.txt         top-level build: options, modules, library target
 |-- CODE_STYLE.md          code style: required reading before editing code
 |-- AGENTS.md              this file
 |-- README.md              introduction to the project
 |-- LICENSE                Unlicense (public domain)
-|-- include/               public headers
-|   |-- types.h                eid_t and common types
-|   |-- sparse_vector.h/.hpp   paged sparse array (the storage core)
-|   |-- storage.h/.hpp         component storages, join/exclude
-|   |-- entity.h/.hpp          entity handle
-|   |-- registry.h/.hpp        registry: entities, systems, events
-|   |-- system.h/.hpp          systems, dependencies, configuration
-|   |-- events.h/.hpp          event queues
-|   `-- type_enumerator.h      assigns ids to component/system/event types
-|-- src/                   non-template .cpp implementations
-|-- cmake/                 build modules (warnings, sanitizers, coverage)
-|-- check/                 the public headers compiled as their own unit
-|-- tests/                 unit tests (Catch2)
-|-- bench/                 benchmarks (off by default, see bench/README.md)
-`-- tools/                 helper scripts (formatting, checks)
+|-- lib/                   the library, and nothing else
+|   |-- include/               public headers
+|   |   |-- types.h                eid_t and common types
+|   |   |-- sparse_vector.h/.hpp   paged sparse array (the storage core)
+|   |   |-- storage.h/.hpp         component storages, join/exclude
+|   |   |-- entity.h/.hpp          entity handle
+|   |   |-- registry.h/.hpp        registry: entities, systems, events
+|   |   |-- system.h/.hpp          systems, dependencies, configuration
+|   |   |-- events.h/.hpp          event queues
+|   |   `-- type_enumerator.h      assigns ids to component/system/event types
+|   `-- src/                   non-template .cpp implementations
+|-- tests/                 everything that verifies the library
+|   |-- *.cpp, common.h        unit tests (Catch2), one case per behaviour
+|   |-- check/headers.cpp      the public headers compiled as their own unit
+|   `-- bench/                 benchmarks (off by default, see tests/bench/README.md)
+`-- tools/                 the scripts and build modules
+    |-- cmake/                 warnings, sanitizers, coverage
+    `-- format.*, check.*, coverage.py
 ```
 
 File naming convention: `*.h` holds declarations, `*.hpp` holds template and
-inline implementations, and `src/*.cpp` holds non-template implementations. New
-code should be laid out the same way.
+inline implementations, and `lib/src/*.cpp` holds non-template implementations.
+New code should be laid out the same way.
+
+Benchmarks live under `tests/` because they are the measurement half of the same
+verification material, not part of the library; they are nevertheless never part
+of a test run (see below). The build modules live under `tools/` because they
+describe how the project is built and checked, not what the library contains.
 
 ---
 
@@ -190,12 +201,12 @@ The library is static and has no external dependencies. It is built as C++17:
 Catch2 v3, which the tests use, requires at least C++14, and the standard was
 moved straight to 17 to avoid a second migration.
 
-Warnings are part of the build, not an optional extra: `cmake/CompilerWarnings.cmake`
+Warnings are part of the build, not an optional extra: `tools/cmake/CompilerWarnings.cmake`
 gives every target the same set (`/W4 /permissive-` on MSVC, `-Wall -Wextra
 -Wconversion -Wsign-conversion` and the rest on GCC and Clang, plus `-Weverything`
 under Clang), and `ECS_WARNINGS_AS_ERRORS` (on by default) turns them into errors.
-`check/headers.cpp` compiles the public headers as their own translation unit and
-instantiates the template surface, so a warning in a header is not hidden until
+`tests/check/headers.cpp` compiles the public headers as their own translation unit
+and instantiates the template surface, so a warning in a header is not hidden until
 somebody uses that combination. Turn the option off only to see the whole list at
 once, e.g. `-DECS_WARNINGS_AS_ERRORS=OFF`.
 
@@ -228,7 +239,7 @@ ordinary shell. Everything is also reachable by hand:
 Sanitizers on Windows come from MSVC only: clang's ASan runtime dies in
 `interception_win` here and its UBSan runtime refuses `/MD` objects, so both are
 refused with an explanation rather than half-wired. The module comment in
-`cmake/Sanitizers.cmake` records what was measured.
+`tools/cmake/Sanitizers.cmake` records what was measured.
 
 ```powershell
 # Windows / MSVC, from the repository root
@@ -255,13 +266,13 @@ with CTest, with one preset per compiler (`msvc`, `clang-cl`, `clang`, `gcc`):
 ```bash
 cmake --preset msvc
 cmake --build --preset msvc
-build/msvc/bench/bench_iter.exe --csv <path outside the repository>
+build/msvc/tests/bench/bench_iter.exe --csv <path outside the repository>
 ```
 
 They size their workload from the machine they run on and report a median with a
 spread, so they are usable on a desktop and on a Raspberry Pi alike. See
-`bench/README.md` before running or changing them, and measure before and after
-any change to `join`, `sparse_vector` or `get_*`.
+`tests/bench/README.md` before running or changing them, and measure before and
+after any change to `join`, `sparse_vector` or `get_*`.
 
 ---
 
@@ -335,5 +346,5 @@ rationale live separately from the code and do not go into the repository.
 | How to lay out code | `CODE_STYLE.md` |
 | What is built and how | `CMakeLists.txt`, `README.md` |
 | How to format | `tools/format.ps1` (Windows), `tools/format.py` (anywhere), `.clang-format` |
-| How to benchmark, and how to read a result | `bench/README.md` |
-| API entry points | `include/registry.h`, `include/entity.h`, `include/storage.h` |
+| How to benchmark, and how to read a result | `tests/bench/README.md` |
+| API entry points | `lib/include/registry.h`, `lib/include/entity.h`, `lib/include/storage.h` |

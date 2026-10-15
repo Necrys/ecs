@@ -11,7 +11,7 @@ option( ECS_BUILD_BENCHMARKS "Build benchmarks" OFF )
 # The build modules are included after the options they depend on: the sanitizer
 # and coverage configurations refuse to combine with benchmarks, so
 # ECS_BUILD_BENCHMARKS has to be known by the time they run.
-list ( APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/cmake )
+list ( APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/tools/cmake )
 include ( CompilerWarnings )
 include ( Sanitizers )
 include ( Coverage )
@@ -24,15 +24,15 @@ set ( CMAKE_CXX_STANDARD_REQUIRED ON )
 set ( CMAKE_CXX_EXTENSIONS OFF )
 
 add_library( ecs
-  src/registry.cpp
-  src/components_storage.cpp
-  src/entity.cpp
-  src/system_base.cpp
+  lib/src/registry.cpp
+  lib/src/components_storage.cpp
+  lib/src/entity.cpp
+  lib/src/system_base.cpp
 )
 
 target_include_directories ( ecs
   PUBLIC
-    ${CMAKE_CURRENT_LIST_DIR}/include
+    ${CMAKE_CURRENT_LIST_DIR}/lib/include
 )
 
 ecs_set_warnings ( ecs )
@@ -41,8 +41,10 @@ ecs_set_warnings ( ecs )
 # surface instantiated. A header warning is otherwise invisible until somebody
 # uses that combination, and the templates here are the library's hot path.
 # Built as an object library: no main(), no link step, and always part of the
-# default build, because the headers matter even when the tests are off.
-add_library( ecs_headers OBJECT check/headers.cpp )
+# default build, because the headers matter even when the tests are off - which is
+# why the target is defined here rather than in tests/, even though its source
+# lives with the tests.
+add_library( ecs_headers OBJECT tests/check/headers.cpp )
 target_link_libraries( ecs_headers PRIVATE ecs )
 ecs_set_warnings ( ecs_headers )
 
@@ -56,5 +58,5 @@ if ( ECS_BUILD_TESTS )
 endif()
 
 if ( ECS_BUILD_BENCHMARKS )
-  add_subdirectory( bench )
+  add_subdirectory( tests/bench )
 endif()

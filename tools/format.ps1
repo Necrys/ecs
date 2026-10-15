@@ -44,7 +44,7 @@
     Reports files whose formatting is wrong without touching them.
 
 .EXAMPLE
-    ./tools/format.ps1 -Paths include/sparse_vector.hpp, src
+    ./tools/format.ps1 -Paths lib/include/sparse_vector.hpp, lib/src
     Reformats a single file and a whole directory.
 
 .OUTPUTS
@@ -123,7 +123,7 @@ if ( -not (Test-Path -LiteralPath $script)) {
 }
 
 # Resolve explicit paths against the repository root rather than the current
-# directory, so that `-Path include/foo.hpp` means the same thing wherever the
+# directory, so that `-Path lib/include/foo.hpp` means the same thing wherever the
 # script is invoked from.
 $resolvedPaths = @()
 if ( $ExplicitPaths ) {

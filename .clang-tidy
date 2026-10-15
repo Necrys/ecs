@@ -46,7 +46,7 @@ Checks: >-
 
 WarningsAsErrors: '*'
 
-HeaderFilterRegex: '(include|src|tests|check)/.*'
+HeaderFilterRegex: '(lib/include|lib/src|tests)/.*'
 
 FormatStyle: file
 

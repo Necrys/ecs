@@ -20,7 +20,7 @@
     {
       "name": "msvc",
       "displayName": "MSVC (Release)",
-      "description": "Default toolchain on Windows. Benchmarks build with /O2 pinned in bench/CMakeLists.txt.",
+      "description": "Default toolchain on Windows. Benchmarks build with /O2 pinned in tests/bench/CMakeLists.txt.",
       "inherits": "base",
       "generator": "Ninja"
     },
@@ -78,7 +78,7 @@
     {
       "name": "msvc-asan",
       "displayName": "MSVC + AddressSanitizer (Debug, tests)",
-      "description": "The memory check on Windows. clang's ASan runtime cannot intercept here and its UBSan runtime refuses the /MD objects, so both are refused on this platform; see cmake/Sanitizers.cmake.",
+      "description": "The memory check on Windows. clang's ASan runtime cannot intercept here and its UBSan runtime refuses the /MD objects, so both are refused on this platform; see tools/cmake/Sanitizers.cmake.",
       "inherits": "tests-only",
       "cacheVariables": {
         "ECS_ENABLE_ASAN": "ON"

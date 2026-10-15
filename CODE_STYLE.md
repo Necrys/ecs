@@ -76,9 +76,10 @@ Notes:
 Enforced by `.clang-format`. **The major version is pinned to 22**: the tool
 refuses another major instead of reporting a verdict the repository was not
 formatted with. The earlier claim that 19 and 22 differ by a single line break is
-wrong, and was measured: 19.1.5 wants changes in `bench/harness.hpp`,
-`bench/machine.hpp`, `include/selection.hpp` and `include/sparse_vector.hpp` -
-where a line is broken, not what the code does. On a machine that has no 22,
+wrong, and was measured: 19.1.5 wants changes in `tests/bench/harness.hpp`,
+`tests/bench/machine.hpp`, `lib/include/selection.hpp` and
+`lib/include/sparse_vector.hpp` - where a line is broken, not what the code does.
+On a machine that has no 22,
 `tools/format.py --any-version` runs anyway and warns; the pinned version is what
 `tools/check.ps1` uses.
 
@@ -112,7 +113,7 @@ provided by the `Catch2WithMain` target, so test sources must not define
   not belong here.
 - `*.hpp` - template and `inline` implementations, included at the end of the
   `*.h`.
-- `src/*.cpp` - non-template implementations.
+- `lib/src/*.cpp` - non-template implementations.
 - Include guards are `#pragma once`.
 - Include order: the corresponding header first, then the standard library, then
   project headers. The formatter does **not** sort includes - the order is a
