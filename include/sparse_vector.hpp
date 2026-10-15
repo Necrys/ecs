@@ -191,7 +191,7 @@ sparse_vector< T, PageSize >::~sparse_vector() {
 template < typename T, size_t PageSize >
 void sparse_vector< T, PageSize >::clear() {
   clear_and_release();
-  m_pages.swap( std::vector< page* >() );
+  std::vector< page* >().swap( m_pages );
 }
 
 template < typename T, size_t PageSize >
