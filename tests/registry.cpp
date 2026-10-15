@@ -6,6 +6,18 @@
 
 #include <vector>
 
+namespace {
+
+// Never added as a system anywhere: it exists so that a dependency can name a
+// type the registry has no slot for.
+class UnregisteredSystem {
+public:
+  void update() {
+  }
+};
+
+}
+
 TEST_CASE( "entity" ) {
 
 SECTION( "allocate" ) {
@@ -117,6 +129,7 @@ SECTION( "mass_deallocate_and_reallocate" ) {
   // Releasing everything must hand the ids back in FIFO order, because the
   // allocation order is part of the observable behaviour.
   for ( int i = 0; i < count; ++i ) {
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access): ids holds count entries
     REQUIRE( r.allocate().id() == ids[ static_cast< size_t >( i ) ] );
   }
 }
@@ -156,6 +169,25 @@ SECTION( "register" ) {
   ecs::registry r;
   r.add_system< System >();
 
+}
+
+}
+
+// Regression coverage for the dependency tree. A dependency naming a type that
+// was never added as a system has an id the vector of systems never grew to, so
+// building the tree used to index past its end. The dependency is ignored, and
+// the update must complete.
+TEST_CASE( "system_dependency_on_unregistered_system" ) {
+
+SECTION( "ignored" ) {
+  ecs::registry r;
+  r.add_system< System >().depends_on< UnregisteredSystem >();
+
+  const auto sid = ecs::type_collection< ecs::systems >::type_id< System >();
+
+  r.update();
+
+  REQUIRE( r.is_system_active( sid ) == true );
 }
 
 }

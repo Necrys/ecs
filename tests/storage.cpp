@@ -27,7 +27,7 @@ SECTION( "insert" ) {
 
   const auto& v = s.add_entity_component< Position >( 200, p );
 
-  const auto vv = s.get_entity_component< Position >( 200 );
+  auto* const vv = s.get_entity_component< Position >( 200 );
 
   REQUIRE( v.x == p.x );
   REQUIRE( v.y == p.y );
@@ -44,7 +44,7 @@ SECTION( "set" ) {
 
   const auto& v = s.set_entity_component< Position >( 200, p2 );
 
-  const auto vv = s.get_entity_component< Position >( 200 );
+  auto* const vv = s.get_entity_component< Position >( 200 );
 
   REQUIRE( v.x == p2.x );
   REQUIRE( v.y == p2.y );
@@ -60,8 +60,8 @@ SECTION( "remove_all" ) {
 
   s.remove_all_components( 200 );
 
-  const auto pc = s.get_entity_component< Position >( 200 );
-  const auto vc = s.get_entity_component< Velocity >( 200 );
+  auto* const pc = s.get_entity_component< Position >( 200 );
+  auto* const vc = s.get_entity_component< Velocity >( 200 );
   bool called = false;
   s.join< Position >( [ & ]( const ecs::eid_t, const Position& ) {
     called = true;
@@ -81,7 +81,7 @@ SECTION( "remove" ) {
 
   s.remove_entity_component< Position >( 200 );
 
-  const auto pc = s.get_entity_component< Position >( 200 );
+  auto* const pc = s.get_entity_component< Position >( 200 );
   bool called = false;
   s.join< Position >( [ & ]( const ecs::eid_t, const Position& ) {
     called = true;
@@ -97,7 +97,7 @@ SECTION( "remove_noexist" ) {
 
   s.remove_entity_component< Position >( 200 );
 
-  const auto pc = s.get_entity_component< Position >( 200 );
+  auto* const pc = s.get_entity_component< Position >( 200 );
 
   REQUIRE( pc == nullptr );
 }
@@ -110,7 +110,7 @@ SECTION( "get" ) {
   ecs::components_storage s;
   const auto& ref = s.add_entity_component< Position >( 200, 3.1415f, 2.7182f );
   
-  auto pc = s.get_entity_component< Position >( 200 );
+  auto* pc = s.get_entity_component< Position >( 200 );
   REQUIRE( *pc == ref );
 }
 
@@ -118,7 +118,7 @@ SECTION( "get_const" ) {
   ecs::components_storage s;
   const auto& ref = s.add_entity_component< Position >( 200, 3.1415f, 2.7182f );
   
-  const auto pc = s.get_entity_component< Position >( 200 );
+  auto* const pc = s.get_entity_component< Position >( 200 );
   REQUIRE( *pc == ref );
 }
 
@@ -126,7 +126,7 @@ SECTION( "get_not_exist" ) {
   ecs::components_storage s;
   s.add_entity_component< Position >( 201, 3.1415f, 2.7182f );
   
-  auto pc = s.get_entity_component< Position >( 200 );
+  auto* pc = s.get_entity_component< Position >( 200 );
   REQUIRE( pc == nullptr );
 }
 
@@ -134,14 +134,14 @@ SECTION( "get_not_exist_const" ) {
   ecs::components_storage s;
   s.add_entity_component< Position >( 201, 3.1415f, 2.7182f );
 
-  const auto pc = s.get_entity_component< Position >( 200 );
+  auto* const pc = s.get_entity_component< Position >( 200 );
   REQUIRE( pc == nullptr );
 }
 
 SECTION( "get_not_exist_2" ) {
   ecs::components_storage s;
 
-  auto pc = s.get_entity_component< Position >( 200 );
+  auto* pc = s.get_entity_component< Position >( 200 );
   REQUIRE( pc == nullptr );
 }
 

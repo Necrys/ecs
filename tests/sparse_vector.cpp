@@ -245,6 +245,7 @@ SECTION( "get_operator" ) {
     ecs::sparse_vector< int > v;
     v.emplace( 0, 666 );
 
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access): operator[] is what is under test
     auto res = v[ 0 ];
     REQUIRE( res == 666 );
 }
@@ -252,6 +253,7 @@ SECTION( "get_operator" ) {
 SECTION( "get_operator_create" ) {
     ecs::sparse_vector< int > v;
 
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access): operator[] is what is under test
     auto res = v[ 0 ];
     REQUIRE( v.exist( 0 ) == true );
     REQUIRE( res == 0 );
@@ -261,6 +263,7 @@ SECTION( "get_operator_not_first_page" ) {
     ecs::sparse_vector< int > v;
     v.emplace( 66, 666 );
 
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access): operator[] is what is under test
     auto res = v[ 66 ];
     REQUIRE( res == 666 );
 }
