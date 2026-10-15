@@ -7,6 +7,10 @@
 // assembly on MSVC.
 #if defined( _MSC_VER )
 
+// The declaration lives in harness.hpp; including it keeps the two from
+// drifting apart, which is also what the missing-prototype check asks for.
+#include "harness.hpp"
+
 extern "C" void bench_keep_alive( void const volatile* value ) {
   // The write is the whole point: it forces the caller's value into a volatile
   // location the compiler cannot reason about. The read-back keeps the variable

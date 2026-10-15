@@ -21,10 +21,6 @@ namespace {
 
 struct Position {
   float x, y;
-  Position() :
-    x( 0.0f ),
-    y( 0.0f ) {
-  }
   Position( const float a, const float b ) :
     x( a ),
     y( b ) {
@@ -33,10 +29,6 @@ struct Position {
 
 struct Velocity {
   float x, y;
-  Velocity() :
-    x( 0.0f ),
-    y( 0.0f ) {
-  }
   Velocity( const float a, const float b ) :
     x( a ),
     y( b ) {
@@ -47,9 +39,6 @@ struct Velocity {
 // path can be measured against the same world as the hit path.
 struct Health {
   int value;
-  Health() :
-    value( 0 ) {
-  }
 };
 
 } // namespace
@@ -85,8 +74,7 @@ int main( int argc, char** argv ) {
   context.config = machine.arch + "-release";
   context.machine = machine;
 
-  char timestamp[ 64 ] = "unset";
-  std::snprintf( timestamp, sizeof( timestamp ), "%s %s", __DATE__, __TIME__ );
+  const std::string timestamp = bench::run_timestamp();
 
   std::vector< bench::Result > results;
   const auto record = [ & ]( bench::Result& result ) {

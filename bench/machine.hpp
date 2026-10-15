@@ -89,8 +89,8 @@ inline void detect_cache_x86( MachineInfo& info ) {
 #else
     __cpuid( 0x80000006, regs[ 0 ], regs[ 1 ], regs[ 2 ], regs[ 3 ] );
 #endif
-    const uint32_t l2_kb = static_cast< uint32_t >( ( regs[ 2 ] >> 16 ) & 0xFFFFu );
-    const uint32_t l3_kb = static_cast< uint32_t >( ( regs[ 3 ] >> 18 ) & 0x3FFFu ) * 512u;
+    const uint32_t l2_kb = ( static_cast< uint32_t >( regs[ 2 ] ) >> 16 ) & 0xFFFFu;
+    const uint32_t l3_kb = ( ( static_cast< uint32_t >( regs[ 3 ] ) >> 18 ) & 0x3FFFu ) * 512u;
     if ( l2_kb != 0 ) {
       info.l2_bytes = static_cast< size_t >( l2_kb ) * 1024u;
     }
@@ -106,14 +106,14 @@ inline void detect_cache_x86( MachineInfo& info ) {
 #else
     __cpuid_count( 4, sub, regs[ 0 ], regs[ 1 ], regs[ 2 ], regs[ 3 ] );
 #endif
-    const unsigned type = static_cast< unsigned >( regs[ 0 ] & 0x1Fu );
+    const unsigned type = static_cast< unsigned >( static_cast< uint32_t >( regs[ 0 ] ) & 0x1Fu );
     if ( type == 0 ) {
       break;
     }
-    const unsigned level = static_cast< unsigned >( ( regs[ 0 ] >> 5 ) & 0x7u );
-    const size_t line = static_cast< size_t >( regs[ 1 ] & 0xFFFu ) + 1u;
-    const size_t ways = static_cast< size_t >( ( regs[ 1 ] >> 22 ) & 0x3FFu ) + 1u;
-    const size_t sets = static_cast< size_t >( regs[ 2 ] ) + 1u;
+    const unsigned level = static_cast< unsigned >( ( static_cast< uint32_t >( regs[ 0 ] ) >> 5 ) & 0x7u );
+    const size_t line = static_cast< size_t >( static_cast< uint32_t >( regs[ 1 ] ) & 0xFFFu ) + 1u;
+    const size_t ways = static_cast< size_t >( ( static_cast< uint32_t >( regs[ 1 ] ) >> 22 ) & 0x3FFu ) + 1u;
+    const size_t sets = static_cast< size_t >( static_cast< uint32_t >( regs[ 2 ] ) ) + 1u;
     const size_t size = line * ways * sets;
 
     if ( level == 2 && info.l2_bytes == 0 ) {

@@ -18,6 +18,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <ctime>
 #include <functional>
 #include <string>
 #include <vector>
@@ -429,6 +430,27 @@ struct RunContext {
   MachineInfo machine;
 };
 
+// Wall-clock time of the run, for the history file. It has to be the moment the
+// measurement was taken, not the moment the binary was built: the same binary is
+// run for days, and a build stamp in every row would date the whole session to
+// whenever it was last compiled.
+inline std::string run_timestamp() {
+  const std::time_t now = std::chrono::system_clock::to_time_t( std::chrono::system_clock::now() );
+
+  std::tm local{};
+#if defined( _MSC_VER )
+  localtime_s( &local, &now );
+#else
+  localtime_r( &now, &local );
+#endif
+
+  char buffer[ 32 ] = "unset";
+  if ( std::strftime( buffer, sizeof( buffer ), "%Y-%m-%d %H:%M:%S", &local ) == 0 ) {
+    return std::string( "unset" );
+  }
+  return std::string( buffer );
+}
+
 inline void print_csv_header( std::FILE* out ) {
   std::fprintf(
     out,
@@ -562,6 +584,26 @@ inline uint64_t& last_cycles() {
   return value;
 }
 
+// Runs `work` once and returns its duration in milliseconds, accumulating the
+// cycle count into last_cycles(). The value the work produced is fed to the
+// checksum by the caller, which is what stops it from being discarded.
+//
+// Declared before `calibrate`, which calls it: with two-phase lookup the call
+// inside a template is not found later, and MSVC under /permissive- rejects it
+// exactly as GCC and clang do.
+template < typename F >
+double time_once_ms( F&& work ) {
+  const auto start = std::chrono::steady_clock::now();
+  const uint64_t start_cycles = read_cycles();
+  work();
+  const uint64_t end_cycles = read_cycles();
+  const auto finish = std::chrono::steady_clock::now();
+  clobber_memory();
+
+  last_cycles() += static_cast< uint64_t >( end_cycles > start_cycles ? end_cycles - start_cycles : 0 );
+  return std::chrono::duration< double, std::milli >( finish - start ).count();
+}
+
 // Frozen calibration for one point: how many repetitions make a single sample
 // long enough to be worth timing, decided once and reused for every sample.
 struct Calibration {
@@ -632,22 +674,6 @@ Calibration calibrate( const RunConfig& config, Setup&& setup, Work&& work ) {
   }
 
   return result;
-}
-
-// Runs `work` once and returns its duration in milliseconds, accumulating the
-// cycle count into last_cycles(). The value the work produced is fed to the
-// checksum by the caller, which is what stops it from being discarded.
-template < typename F >
-double time_once_ms( F&& work ) {
-  const auto start = std::chrono::steady_clock::now();
-  const uint64_t start_cycles = read_cycles();
-  work();
-  const uint64_t end_cycles = read_cycles();
-  const auto finish = std::chrono::steady_clock::now();
-  clobber_memory();
-
-  last_cycles() += static_cast< uint64_t >( end_cycles > start_cycles ? end_cycles - start_cycles : 0 );
-  return std::chrono::duration< double, std::milli >( finish - start ).count();
 }
 
 // Measures `work` at one point: warmup, then `samples` timed runs.
