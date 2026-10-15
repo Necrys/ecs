@@ -222,14 +222,13 @@ ordinary shell. Everything is also reachable by hand:
 | Warnings | `-DECS_WARNINGS_AS_ERRORS=ON` is the default; `OFF` prints the whole list instead of stopping |
 | Sanitizers | `cmake --preset msvc-asan` on Windows. Elsewhere `-DECS_ENABLE_ASAN=ON -DECS_ENABLE_UBSAN=ON`; `ECS_ENABLE_TSAN` exists for the day there are threads |
 | Coverage | `python tools/coverage.py` builds the `coverage` preset, runs the tests instrumented, merges the profiles and checks the floor; `--uncovered` lists the lines no test reaches, `--slow` includes the `[slow]` cases, `--html DIR` writes a report |
-| clang-tidy | `cmake --preset tidy` produces a compile database, then `clang-tidy -p build/tidy <file>`; the checks and the reasons for what is off are in `.clang-tidy` |
-| Tests | `ctest --test-dir build/<preset> --output-on-failure`. Every Catch2 `TEST_CASE` is a separate CTest test named `<file>.<case>`, so `ctest -R registry.entity` runs one of them. Cases tagged `[slow]` are left out of that set; run them through their binary or `coverage.py --slow` |
+| clang-tidy | `cmake --preset tidy` produces a compile database, then `clang-tidy -p build/tidy <file>`; the checks and the reasons for what is off are in `.clang-tidy`. Findings are errors: the report is empty and stays that way, so a new finding is either fixed or the check is disabled there with a reason |
+| Tests | `ctest --test-dir build/<preset> --output-on-failure`. Every Catch2 `TEST_CASE` is a separate CTest test named `<file>.<case>`, so `ctest -R registry.entity` runs one of them. A case's tags are its CTest labels: `ctest -L unit`, `-L integration`, `-L regression`, `-L "^d1$"` for a defect. Cases tagged `[slow]` are left out of the set by default; run them through their binary or `coverage.py --slow` |
 
 Sanitizers on Windows come from MSVC only: clang's ASan runtime dies in
 `interception_win` here and its UBSan runtime refuses `/MD` objects, so both are
 refused with an explanation rather than half-wired. The module comment in
-`cmake/Sanitizers.cmake` records what was measured. Findings from clang-tidy are
-a report, not a gate: the C++17 review works through them.
+`cmake/Sanitizers.cmake` records what was measured.
 
 ```powershell
 # Windows / MSVC, from the repository root

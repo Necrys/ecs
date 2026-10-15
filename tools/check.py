@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3/usr/bin/env python3
 """Run the checks a commit is expected to pass.
 
 This is the gate the repository rules describe: the code is formatted, it builds
@@ -22,7 +22,6 @@ Options
     --sanitizers      also build and run the sanitizer configuration
     --tidy            also run clang-tidy over the library, the header check and the tests
     --full            --sanitizers and --tidy
-    --strict-tidy     treat clang-tidy findings as a failure (they are a report)
     --format-all      check every tracked file, not only the staged ones
     --no-format       skip the formatting check
     --no-build        skip the build
@@ -291,7 +290,7 @@ def find_clang_tidy() -> str | None:
     return shutil.which("clang-tidy")
 
 
-def step_tidy(shell: Shell, strict: bool) -> bool:
+def step_tidy(shell: Shell) -> bool:
     say("== clang-tidy")
 
     clang_tidy = find_clang_tidy()
@@ -328,20 +327,26 @@ def step_tidy(shell: Shell, strict: bool) -> bool:
 
     # One process per file: clang-tidy takes a single translation unit, and the
     # per-file invocation keeps a failure from hiding the rest of the report.
+    # Findings are counted from the diagnostic tags, which clang-tidy prints for
+    # both warnings and errors: .clang-tidy raises them to errors, so the same
+    # check name can arrive either way.
     findings: dict[str, int] = {}
     failed = 0
     for source in sorted(set(sources)):
         result = shell.run([clang_tidy, "-p", str(database), source], capture=True)
         output = (result.stdout or "") + (result.stderr or "")
+        reported = False
         for line in output.splitlines():
-            if "warning:" not in line or not line.rstrip().endswith("]"):
+            if not line.rstrip().endswith("]") or ("warning:" not in line and "error:" not in line):
                 continue
             names = line.rstrip()[line.rfind("[") + 1 : -1].split(",")
             for name in names:
                 findings[name.strip()] = findings.get(name.strip(), 0) + 1
-        if result.returncode != 0 and "error:" in output:
+            reported = True
+        if result.returncode != 0 and ("error:" in output or reported):
             failed += 1
-            say(f"   {source}: clang-tidy reported an error")
+            if not reported:
+                say(f"   {source}: clang-tidy reported an error")
 
     total = sum(findings.values())
     say(f"   {len(set(sources))} files, {total} findings, {failed} files with errors")
@@ -353,16 +358,15 @@ def step_tidy(shell: Shell, strict: bool) -> bool:
         say("   ok (no findings)")
         return True
 
-    say("   a report, not a gate - see .clang-tidy; the C++17 review (plan 2.4) works through it")
+    # .clang-tidy raises findings to errors, so reaching this point means the
+    # configuration was told otherwise, or a check reported a warning only.
+    say("   findings (raised to errors by .clang-tidy)")
     for name, count in sorted(findings.items(), key=lambda item: -item[1])[:10]:
         say(f"     {count:5}  {name}")
     if len(findings) > 10:
         say(f"     ... and {len(findings) - 10} more checks")
-
-    if strict:
-        say("   FAILED: --strict-tidy was requested")
-        return False
-    return True
+    say("   FAILED: the report is meant to be empty - fix the finding or disable the check with a reason")
+    return False
 
 
 def main() -> int:
@@ -371,7 +375,6 @@ def main() -> int:
     parser.add_argument("--sanitizers", action="store_true", help="also run the sanitizer configuration")
     parser.add_argument("--tidy", action="store_true", help="also run clang-tidy")
     parser.add_argument("--full", action="store_true", help="--sanitizers and --tidy")
-    parser.add_argument("--strict-tidy", action="store_true", help="clang-tidy findings fail the run")
     parser.add_argument("--format-all", action="store_true", help="check every tracked file, not only staged ones")
     parser.add_argument("--no-format", action="store_true", help="skip the formatting check")
     parser.add_argument("--no-build", action="store_true", help="skip the build")
@@ -398,7 +401,7 @@ def main() -> int:
         if args.sanitizers or args.full:
             results.append(step_sanitizers(shell, args.preset))
         if args.tidy or args.full:
-            results.append(step_tidy(shell, args.strict_tidy))
+            results.append(step_tidy(shell))
     except EnvironmentError as error:
         print(f"error: {error}", file=sys.stderr)
         return 2

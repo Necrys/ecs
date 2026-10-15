@@ -20,8 +20,11 @@
 #   readability-named-parameter           - an unnamed parameter is how the code says
 #                                           "unused"; naming it would trip -Wunused-parameter
 #
-# Findings are a report for now, not a gate: the C++17 review (plan 2.4) works
-# through them, and the high-signal checks become errors once the list is empty.
+# Findings are a gate. The first run produced 46, all of them dealt with (fixed or
+# disabled above with a reason), and the report has been empty since the tests were
+# split into per-behaviour cases. Anything new is therefore either a real defect or
+# a check that does not fit the design - and the second case belongs in the list
+# above with its reason, not in a list of accepted findings.
 ---
 Checks: >-
   bugprone-*,
@@ -41,7 +44,7 @@ Checks: >-
   -cppcoreguidelines-pro-bounds-constant-array-index,
   -readability-named-parameter
 
-WarningsAsErrors: ''
+WarningsAsErrors: '*'
 
 HeaderFilterRegex: '(include|src|tests|check)/.*'
 

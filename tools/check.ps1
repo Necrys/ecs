@@ -20,11 +20,8 @@
     Also build and run the sanitizer configuration.
 
 .PARAMETER Tidy
-    Also run clang-tidy over the library, the header check and the tests.
-
-.PARAMETER StrictTidy
-    Treat clang-tidy findings as a failure. By default they are a report, see
-    .clang-tidy.
+    Also run clang-tidy over the library, the header check and the tests. Its
+    findings are errors, see .clang-tidy.
 
 .PARAMETER FormatAll
     Check the formatting of every tracked file instead of the staged ones.
@@ -59,7 +56,6 @@ param(
     [switch] $Full,
     [switch] $Sanitizers,
     [switch] $Tidy,
-    [switch] $StrictTidy,
     [switch] $FormatAll,
     [switch] $NoFormat,
     [switch] $NoBuild,
@@ -123,7 +119,6 @@ if ( $Preset ) { $arguments += @('--preset', $Preset) }
 if ( $Full ) { $arguments += '--full' }
 if ( $Sanitizers ) { $arguments += '--sanitizers' }
 if ( $Tidy ) { $arguments += '--tidy' }
-if ( $StrictTidy ) { $arguments += '--strict-tidy' }
 if ( $FormatAll ) { $arguments += '--format-all' }
 if ( $NoFormat ) { $arguments += '--no-format' }
 if ( $NoBuild ) { $arguments += '--no-build' }
