@@ -96,16 +96,16 @@ bool registry::rebuild_system_dependency_tree() {
 
     // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
     const auto& deps = m_systemDependenciesMatrix[ sid ];
-    for ( auto it = deps.cbegin(); it != deps.cend(); ++it ) {
+    for ( const auto dep : deps ) {
       // A dependency that was never added as a system has an id the vector has
       // never grown to; reading it would be out of bounds. Ignoring it matches
       // how a dependency cycle is treated today - D10 tracks making both loud.
-      if ( *it >= m_systems.size() ) {
+      if ( dep >= m_systems.size() ) {
         continue;
       }
 
       // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
-      m_systems[ sid ]->add_dependency( m_systems[ *it ] );
+      m_systems[ sid ]->add_dependency( m_systems[ dep ] );
     }
   }
 
