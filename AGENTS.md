@@ -24,12 +24,12 @@ subscribe to events and declare dependencies between each other.
    Raspberry Pi 1/2 (ARMv6/ARMv7, 32-bit).
 
 Configurations verified against the current code: MSVC (VS 2022), Clang in MSVC
-mode (`clang-cl`) and Clang in GNU mode, all on Windows x64. On Raspberry Pi,
-GCC 14.2 builds the library on both boards and the full test suite passes on the
-Pi 1 (ARMv6); the Pi 2 (ARMv7) library build is verified, its tests are not yet.
-Linux x64 remains a target platform that has not been verified. MinGW-w64 and
-macOS are currently out of scope: there is no way to build or check them, and
-claiming unverified support is meaningless.
+mode (`clang-cl`) and Clang in GNU mode, all on Windows x64; GCC 14.2 on both
+Raspberry Pi 1 (ARMv6) and Pi 2 (ARMv7), where the library builds, the header
+check compiles and the full test suite passes. Linux x64 remains a target
+platform that has not been verified. MinGW-w64 and macOS are currently out of
+scope: there is no way to build or check them, and claiming unverified support is
+meaningless.
 
 The library is provided as is: this is a non-commercial hobby project and you
 use it at your own risk. The license is the Unlicense (public domain), with no
