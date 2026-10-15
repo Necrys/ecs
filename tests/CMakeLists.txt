@@ -71,6 +71,14 @@ foreach ( target ${tests} )
 
   ecs_set_warnings ( ${target} )
 
+  # -Wfloat-equal is right in general and wrong here: these tests store a value and
+  # read it back, so equality is exactly what they mean to assert, and an epsilon
+  # would hide the truncating defect they exist to catch. The flag is turned off for
+  # the test targets alone - the library itself never compares floats.
+  if ( CMAKE_CXX_COMPILER_ID MATCHES "Clang" )
+    target_compile_options ( ${target} PRIVATE -Wno-float-equal )
+  endif()
+
   # An instrumented executable has to find its runtime, and the DLL that matches
   # an import library is the one from the compiler that produced it - another
   # toolchain ships a DLL of the same name. Copying it next to the executable

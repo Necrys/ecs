@@ -1,40 +1,38 @@
 #pragma once
 
-#include <cstring>
 #include <initializer_list>
 #include <string>
 
 struct Position {
-  float x, y;
+  float x{}, y{};
 
-  Position() {
-  }
+  Position() = default;
   Position( const float _x, const float _y ) :
     x( _x ),
     y( _y ) {
   }
 
-  // Bit-exact on purpose, and compared as bytes because of it: what these tests
-  // assert is that a component comes back out of a container exactly as it went in,
-  // and clang is right that == on floats is a trap in general - an epsilon here
-  // would hide a truncating defect instead of catching it.
+  // Exact on purpose: what these tests assert is that a component comes back out of
+  // a container exactly as it went in, and an epsilon here would hide a truncating
+  // defect instead of catching it. Clang is right that comparing floats is a trap in
+  // general, which is why -Wfloat-equal is turned off for the test targets - see
+  // tests/CMakeLists.txt.
   bool operator==( const Position& other ) const {
-    return std::memcmp( this, &other, sizeof( *this ) ) == 0;
+    return x == other.x && y == other.y;
   }
 };
 
 struct Velocity {
-  float x, y;
+  float x{}, y{};
 
-  Velocity() {
-  }
+  Velocity() = default;
   Velocity( const float _x, const float _y ) :
     x( _x ),
     y( _y ) {
   }
 
   bool operator==( const Velocity& other ) const {
-    return std::memcmp( this, &other, sizeof( *this ) ) == 0;
+    return x == other.x && y == other.y;
   }
 };
 
@@ -42,10 +40,9 @@ struct Event {};
 
 // A second value component, used where a test needs two independent storages.
 struct Tag {
-  int value;
+  int value{};
 
-  Tag() {
-  }
+  Tag() = default;
   Tag( const int v ) :
     value( v ) {
   }
@@ -60,10 +57,13 @@ public:
   }
 };
 
-// Counts delivered events so tests can assert on event delivery.
+// Counts the events delivered to it, so a test can ask the registry for the system
+// and read what it saw. An instance member rather than a static one: every test in
+// the binary shares the type, and a counter they all write to is state left behind
+// by whichever of them ran first.
 class CountingSystem {
 public:
-  static int received;
+  int received = 0;
 
   void update() {
   }
@@ -95,7 +95,7 @@ public:
     }
   }
 
-  bool matches( const std::initializer_list< int > expected ) const {
+  [[nodiscard]] bool matches( const std::initializer_list< int > expected ) const {
     if ( expected.size() != m_count ) {
       return false;
     }
@@ -111,7 +111,7 @@ public:
 
   // What actually ran: a bare `false` from matches() would not say what the order
   // was instead.
-  std::string describe() const {
+  [[nodiscard]] std::string describe() const {
     std::string text = "[";
     for ( size_t index = 0; index < m_count; ++index ) {
       text += ( index == 0 ? "" : ", " ) + std::to_string( m_entries[ index ] );

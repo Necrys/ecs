@@ -222,14 +222,12 @@ TEST_CASE( "events", "[integration]" ) {
     ecs::registry r;
     r.add_system< CountingSystem >().handles< Event >();
 
-    // The counter is static, so the test asserts on the change it caused rather
-    // than on an absolute value: sections do not run in a promised order.
-    const int before = CountingSystem::received;
+    const int before = r.get_system< CountingSystem >().get().received;
 
     r.push_event< Event >( Event{} );
     r.update();
 
-    REQUIRE( CountingSystem::received == before + 1 );
+    REQUIRE( r.get_system< CountingSystem >().get().received == before + 1 );
   }
 
   // Nothing subscribes, so there is no queue to put the event in. Documented
@@ -238,12 +236,15 @@ TEST_CASE( "events", "[integration]" ) {
   // publishing without a subscriber must not crash or reach anybody later.
   SECTION( "no_subscriber_is_not_an_error" ) {
     ecs::registry r;
-    const int before = CountingSystem::received;
+
+    // Registered but not subscribed: the system is there to be asked, and the
+    // answer is that nothing arrived.
+    r.add_system< CountingSystem >();
 
     r.push_event< Event >( Event{} );
     r.update();
 
-    REQUIRE( CountingSystem::received == before );
+    REQUIRE( r.get_system< CountingSystem >().get().received == 0 );
   }
 }
 
@@ -396,5 +397,3 @@ TEST_CASE( "entity_id_space_exhaustion", "[unit][slow]" ) {
 
   REQUIRE_THROWS_AS( r.allocate(), std::runtime_error );
 }
-
-int CountingSystem::received = 0;
