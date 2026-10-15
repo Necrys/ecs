@@ -171,7 +171,7 @@ ecs/
 |   |-- events.h/.hpp          event queues
 |   `-- type_enumerator.h      assigns ids to component/system/event types
 |-- src/                   non-template .cpp implementations
-|-- cmake/                 build modules (warnings, sanitizers)
+|-- cmake/                 build modules (warnings, sanitizers, coverage)
 |-- check/                 the public headers compiled as their own unit
 |-- tests/                 unit tests (Catch2)
 |-- bench/                 benchmarks (off by default, see bench/README.md)
@@ -221,8 +221,9 @@ ordinary shell. Everything is also reachable by hand:
 | Formatting | `python tools/format.py --check` (all files) or `--staged` (what is about to be committed); clang-format 22 is pinned, `--any-version` overrides it with a warning |
 | Warnings | `-DECS_WARNINGS_AS_ERRORS=ON` is the default; `OFF` prints the whole list instead of stopping |
 | Sanitizers | `cmake --preset msvc-asan` on Windows. Elsewhere `-DECS_ENABLE_ASAN=ON -DECS_ENABLE_UBSAN=ON`; `ECS_ENABLE_TSAN` exists for the day there are threads |
+| Coverage | `python tools/coverage.py` builds the `coverage` preset, runs the tests instrumented, merges the profiles and checks the floor; `--uncovered` lists the lines no test reaches, `--html DIR` writes a report |
 | clang-tidy | `cmake --preset tidy` produces a compile database, then `clang-tidy -p build/tidy <file>`; the checks and the reasons for what is off are in `.clang-tidy` |
-| Tests | `ctest --test-dir build/<preset> --output-on-failure` |
+| Tests | `ctest --test-dir build/<preset> --output-on-failure`. Every Catch2 `TEST_CASE` is a separate CTest test named `<file>.<case>`, so `ctest -R registry.entity` runs one of them |
 
 Sanitizers on Windows come from MSVC only: clang's ASan runtime dies in
 `interception_win` here and its UBSan runtime refuses `/MD` objects, so both are

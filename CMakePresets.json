@@ -85,6 +85,18 @@
       }
     },
     {
+      "name": "coverage",
+      "displayName": "Clang (MSVC mode) + coverage (Debug, tests)",
+      "description": "Source-based coverage for the library: the tests run instrumented, and tools/coverage.py merges the profiles and reports with llvm-cov. MSVC cannot do this here - its coverage tool belongs to Visual Studio Enterprise.",
+      "inherits": "tests-only",
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "clang-cl",
+        "CMAKE_CXX_COMPILER": "clang-cl",
+        "ECS_ENABLE_COVERAGE": "ON",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+      }
+    },
+    {
       "name": "tidy",
       "displayName": "Clang (MSVC mode), compile database (Debug, tests)",
       "description": "Nothing is compiled here: this configuration exists to produce compile_commands.json, which tools/check.py feeds to clang-tidy. Running the tool through the compile database keeps it away from the MSVC frontend flags that clang-tidy cannot re-parse.",
@@ -105,6 +117,7 @@
     { "name": "gcc-pi", "configurePreset": "gcc-pi" },
     { "name": "tests-only", "configurePreset": "tests-only" },
     { "name": "msvc-asan", "configurePreset": "msvc-asan" },
+    { "name": "coverage", "configurePreset": "coverage" },
     { "name": "tidy", "configurePreset": "tidy" }
   ]
 }

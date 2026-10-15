@@ -110,7 +110,8 @@ class Shell:
         self.vcvars: str | None = None
         self._env: dict[str, str] | None = None
 
-    def _load_environment(self) -> dict[str, str] | None:
+    def environment(self) -> dict[str, str] | None:
+        """The environment every command should run with, loading it once."""
         if self._env is not None:
             return self._env
 
@@ -151,7 +152,7 @@ class Shell:
         return self._env
 
     def run(self, command: list[str], capture: bool = False) -> subprocess.CompletedProcess:
-        environment = self._load_environment()
+        environment = self.environment()
         return subprocess.run(
             command,
             cwd=REPO_ROOT,
