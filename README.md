@@ -39,8 +39,10 @@ that still has a way to go before it works reliably.
 
 ## Building
 
-You need a C++ compiler and CMake 3.12+. The library is static and has no
-dependencies.
+You need a C++17 compiler and CMake 3.12+. The library is static and has no
+dependencies; the tests fetch Catch2 v3 (pinned to an exact commit), so the
+first configure needs network access. Pass `-DECS_BUILD_TESTS=OFF` to build the
+library on its own.
 
 Verified configurations:
 
@@ -68,8 +70,12 @@ cmake --build build
 ```
 
 Tests and benchmarks are built separately and serve as a demonstration; the
-library itself does not depend on them. Building the tests is broken in the
-current state - that is one of the first tasks to address.
+library itself does not depend on them. The tests build and pass, and are
+registered with CTest:
+
+```bash
+ctest --test-dir build --output-on-failure
+```
 
 ---
 

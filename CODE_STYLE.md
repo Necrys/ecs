@@ -4,6 +4,10 @@ Rules for the layout of `ecs` code. Formatting is enforced mechanically by
 `.clang-format`; everything else is a convention that has to be followed
 deliberately.
 
+The project is built as **C++17**. Catch2 v3, which the tests use, requires at
+least C++14, and the standard was moved straight to 17 to avoid a second
+migration.
+
 Autoformatting is mandatory and not up for discussion: **do not align code by
 hand**. To apply and to check:
 
@@ -85,6 +89,10 @@ Two tool limitations are worth knowing:
   the option was removed from clang-format in v19;
 - `SECTION` blocks in tests are formatted as ordinary nested blocks and get
   indented, even though historically they sat at column zero.
+
+Tests use Catch2 v3 (`<catch2/catch_test_macros.hpp>`). The test runner is
+provided by the `Catch2WithMain` target, so test sources must not define
+`CATCH_CONFIG_MAIN` and must not provide their own `main`.
 
 ---
 

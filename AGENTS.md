@@ -65,7 +65,7 @@ The broad picture:
 
 - the library itself (component storage, registry, systems, events) exists but
   needs to be brought to a working state;
-- tests exist but do not build in the current state;
+- tests build and run, but cover only part of the library;
 - there are no benchmarks at all;
 - multithreading, resources and deferred operations are not implemented;
 - there is no user-facing documentation beyond `README.md`.
@@ -107,26 +107,34 @@ code should be laid out the same way.
 
 ## 5. Building and running tests
 
-The library is static and has no external dependencies. The tests pull Catch2
-through `FetchContent`; in the current state this is **broken** (there is no
-`GIT_TAG`, and Catch2 renamed the `master` branch to `devel`), which makes
-fixing the tests one of the first tasks. `ECS_BUILD_TESTS` is on by default, so
-the default configuration currently fails.
+The library is static and has no external dependencies. It is built as C++17:
+Catch2 v3, which the tests use, requires at least C++14, and the standard was
+moved straight to 17 to avoid a second migration.
+
+The tests pull Catch2 through `FetchContent`, pinned to an exact commit of
+v3.16.1 (see `tests/CMakeLists.txt`), so the dependency cannot shift under us.
+`ECS_BUILD_TESTS` is on by default, which means the first configure downloads
+Catch2 and therefore needs network access; use `-DECS_BUILD_TESTS=OFF` for an
+offline library-only build.
 
 ```powershell
 # Windows / MSVC, from the repository root
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
 cmake --build build
+ctest --test-dir build --output-on-failure
 ```
 
 ```bash
 # Linux / GCC or Clang
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
 cmake --build build -j
+ctest --test-dir build --output-on-failure
 ```
 
 With MSVC it is convenient to call `vcvars64.bat` once, otherwise `cmake` will
-not find the compiler.
+not find the compiler. The test binaries can also be run directly; they take the
+usual Catch2 command line (`sparse_vector.exe --list-tests`, `-s` for verbose
+output, and so on).
 
 ---
 
