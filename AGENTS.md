@@ -6,7 +6,7 @@ task.
 
 ---
 
-## 1. What this is
+## What this is
 
 `ecs` is a small header-heavy **Entity-Component-System** library for C++.
 An entity is an identifier; components are ordinary user-defined structs stored
@@ -36,7 +36,48 @@ test/demo material and are not part of the library itself.
 
 ---
 
-## 2. Branches and commits
+## Design principles
+
+These are not incidental choices; they shape the code and new work is expected to
+follow them.
+
+### Data and logic stay separate
+
+Component storages exist to hold data, not to contain behaviour. A component is
+raw data; whatever operates on it belongs in systems, outside the container. The
+containers follow the same rule: they offer storage and traversal and nothing
+else.
+
+This is why the design is POD-first. Storing plain, trivially destructible data
+is the primary case, and the hot paths are written for it. Supporting types with
+destructors is a different problem - it needs explicit lifetime management - and
+it is not solved by making the existing containers heavier.
+
+A separate container variant for non-POD types is a reasonable future direction,
+where destructor calls can be handled properly in isolation. Until then, treat
+POD-first as the contract, and do not mix the two concerns in one container.
+
+### Push work into compile time
+
+Performance is the top priority, and a large part of it is meant to come from
+resolving things at compile time rather than at run time. That is why the code is
+wrapped in templates fairly heavily: type ids, storage lookups and iteration over
+component packs are all meant to collapse into constant code.
+
+Keep it that way. Where a choice exists between a run-time mechanism (virtual
+dispatch, type erasure, lookup tables keyed by something computed at run time)
+and a compile-time one (templates, `if constexpr`, `static_assert`), prefer the
+compile-time one unless it makes the code materially harder to follow. Templates
+are a deliberate cost paid for speed; do not pay it and then do the work at run
+time anyway.
+
+A caveat: this is an ideal to reach for, not a licence for unreadable
+metaprogramming. If a compile-time construction becomes impossible to follow, say
+so and discuss it rather than layering more machinery on top.
+
+---
+
+## Branches and commits
 
 - **`master` is the only development branch.** All work happens here.
 - **`2020_last` is frozen history.** The last state of the original 2020 line.
@@ -53,7 +94,7 @@ commit messages - is written in **English**.
 
 ---
 
-## 3. Current state (important to understand before starting)
+## Current state (important to understand before starting)
 
 `master` is in an intermediate state: part of what is planned is not
 implemented, part is outdated, and part has known defects. **Current behaviour
@@ -75,7 +116,7 @@ architectural area, make sure it is not marked as pending replacement.
 
 ---
 
-## 4. Repository layout
+## Repository layout
 
 ```
 ecs/
@@ -105,7 +146,7 @@ code should be laid out the same way.
 
 ---
 
-## 5. Building and running tests
+## Building and running tests
 
 The library is static and has no external dependencies. It is built as C++17:
 Catch2 v3, which the tests use, requires at least C++14, and the standard was
@@ -138,15 +179,15 @@ output, and so on).
 
 ---
 
-## 6. Rules for agents
+## Rules for agents
 
 ### General
 
-- **Develop on `master` only.** Do not touch `2020_last` (see section 2).
+- **Develop on `master` only.** Do not touch `2020_last` (see "Branches and commits").
 - **Do not add third-party dependencies** without explicit agreement: the goal
   is to stay lightweight and build using nothing but the compiler.
 - **Do not change `LICENSE`** on your own - that is the author's decision.
-- **Do not create documentation nobody reads.** See section 7.
+- **Do not create documentation nobody reads.** See "Documentation: what to write and where".
 - **Write in English**: code, identifiers, comments, documentation and commit
   messages.
 
@@ -172,11 +213,11 @@ output, and so on).
 
 - Do not refactor unrelated things along the way.
 - Do not "improve" style by hand: `clang-format` owns style.
-- Do not write essay-length comments (see section 7).
+- Do not write essay-length comments (see "Documentation: what to write and where").
 
 ---
 
-## 7. Documentation: what to write and where
+## Documentation: what to write and where
 
 Priority order, from most to least important.
 
@@ -198,7 +239,7 @@ rationale live separately from the code and do not go into the repository.
 
 ---
 
-## 8. Quick reference
+## Quick reference
 
 | Question | Where to look |
 |---|---|

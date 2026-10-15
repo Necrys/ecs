@@ -34,6 +34,10 @@ check). For individual files, use `-Paths` / `--files`.
    justified.
 4. **Interface symmetry.** If there is a non-`const` overload, there is a
    `const` one; if there is `add`, there is `remove`; and so on.
+5. **Data and logic stay separate.** Containers hold data; behaviour lives in
+   systems. See 6.5.
+6. **Resolve at compile time what can be resolved then.** Templates are the
+   deliberate mechanism for this. See 6.3.
 
 ---
 
@@ -188,15 +192,48 @@ Allowed forms: `//` for lines, `/* ... */` for section separators (as in
 
 ### 6.3. Templates
 
-- Use `static_assert` to check requirements on parameters instead of letting
-  errors surface deep inside instantiation.
-- `std::enable_if` is used in the current code to select overloads; when the
-  standard is updated, prefer `if constexpr` and concepts where they simplify
-  the code.
+Templates are the main tool for the top-priority goal: work that can be decided
+at compile time must not be deferred to run time. Type ids, storage lookups and
+iteration over a pack of component types are all expected to collapse into
+constant code.
+
+- Prefer a compile-time mechanism over a run-time one. Virtual dispatch, type
+  erasure and tables keyed by a run-time value are the fallback, not the default;
+  if one is needed, the reason belongs in a comment.
+- Use `static_assert` to state requirements on parameters, so violations are
+  reported where they are made rather than deep inside instantiation.
+- Prefer `if constexpr` and concepts over `std::enable_if` and tag dispatch;
+  `enable_if` remains in the current code and is worth replacing when touched.
 - Lazy initialisation through local `static` variables in templates is
   acceptable, but keep initialisation order across translation units in mind.
+- Templating is a cost, not a virtue in itself. Do not template something whose
+  parameters are never varied at compile time, and do not buy readability with
+  metaprogramming that no one can follow - raise it instead of layering more on
+  top.
 
-### 6.4. Forbidden
+### 6.4. Data design
+
+Containers store data. They do not implement behaviour on that data: no
+component-specific logic, no callbacks that know about a particular component
+type, no policy hooks that exist only to serve one use case. Traversal and
+storage are the whole contract.
+
+The containers are POD-first. A component is expected to be plain, trivially
+destructible data, and the hot paths are written on that assumption. Types that
+own resources are a different problem: their lifetimes need explicit management,
+and that is not solved by making the ordinary container heavier.
+
+- Do not add destructor or exception handling to the existing containers to
+  accommodate non-POD types. A separate container variant is the intended place
+  for that work.
+- Do not blur the line by letting a container know what a component means. If a
+  container needs to ask what type it holds in order to do its job, the logic is
+  in the wrong place.
+- When touching iteration, keep the cost proportional to the number of matching
+  entities: walk the smallest storage involved rather than the span of
+  identifiers, so that a sparse world does not cost more than a dense one.
+
+### 6.5. Forbidden
 
 - `using namespace` in headers.
 - Macros for constants and "functions" - use `constexpr` and templates.

@@ -3,10 +3,16 @@
 A small header-heavy **Entity-Component-System** library for C++.
 
 An entity is just an identifier. A component is an ordinary struct holding your
-data. A system is an object with an `update()` method that walks the components
+data - plain, trivially destructible data is the case the containers are built
+for. A system is an object with an `update()` method that walks the components
 it cares about. The library takes care of storing components, finding them,
 ordering systems and delivering events. No external dependencies, no code
 generation, no magic - just headers and a little bit of `.cpp`.
+
+Data and logic are kept apart on purpose: containers store, systems compute. The
+same reasoning drives the implementation towards compile-time work - type ids,
+storage lookups and iteration over a set of components are resolved by the
+compiler, which is where much of the performance comes from.
 
 Project goals, in order of importance:
 
