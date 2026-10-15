@@ -2,7 +2,7 @@
 
 #include <type_enumerator.h>
 
-TEST_CASE( "init" ) {
+TEST_CASE( "init", "[unit]" ) {
   SECTION( "default" ) {
     struct component_storages {};
     struct system_storages {};

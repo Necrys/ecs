@@ -18,7 +18,7 @@ public:
 
 }
 
-TEST_CASE( "entity" ) {
+TEST_CASE( "entity", "[unit]" ) {
   SECTION( "allocate" ) {
     ecs::registry r;
 
@@ -59,7 +59,7 @@ TEST_CASE( "entity" ) {
   }
 }
 
-TEST_CASE( "entity_components" ) {
+TEST_CASE( "entity_components", "[integration]" ) {
   SECTION( "add" ) {
     ecs::registry r;
 
@@ -103,60 +103,58 @@ TEST_CASE( "entity_components" ) {
   }
 }
 
-TEST_CASE( "entity_bulk_reuse" ) {
-  // Regression coverage for the free-list lookup: it used to walk a growing list
-  // on every deallocate, which made releasing N entities quadratic.
-  SECTION( "mass_deallocate_and_reallocate" ) {
-    const int count = 5000;
+// Regression coverage for the free-list lookup: it used to walk a growing list
+// on every deallocate, which made releasing N entities quadratic.
+TEST_CASE( "mass_deallocate_and_reallocate", "[integration][regression][d4]" ) {
+  const int count = 5000;
 
-    ecs::registry r;
-    std::vector< ecs::eid_t > ids;
-    ids.reserve( count );
+  ecs::registry r;
+  std::vector< ecs::eid_t > ids;
+  ids.reserve( count );
 
-    for ( int i = 0; i < count; ++i ) {
-      ids.push_back( r.allocate().id() );
-    }
-
-    for ( const auto id : ids ) {
-      r.deallocate( id );
-    }
-
-    // Releasing everything must hand the ids back in FIFO order, because the
-    // allocation order is part of the observable behaviour.
-    for ( int i = 0; i < count; ++i ) {
-      // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access): ids holds count entries
-      REQUIRE( r.allocate().id() == ids[ static_cast< size_t >( i ) ] );
-    }
+  for ( int i = 0; i < count; ++i ) {
+    ids.push_back( r.allocate().id() );
   }
 
-  SECTION( "double_release_is_ignored" ) {
-    ecs::registry r;
-
-    const auto first = r.allocate();
-    const auto second = r.allocate();
-
-    r.deallocate( first );
-    r.deallocate( first ); // must not queue the id twice
-    r.deallocate( second );
-
-    REQUIRE( r.allocate().id() == first.id() );
-    REQUIRE( r.allocate().id() == second.id() );
+  for ( const auto id : ids ) {
+    r.deallocate( id );
   }
 
-  SECTION( "released_components_are_cleared" ) {
-    ecs::registry r;
-
-    auto e = r.allocate();
-    e.add< Position >( 1.0f, 2.0f );
-
-    r.deallocate( e );
-
-    const ecs::components_storage* cs = &r.components();
-    REQUIRE( cs->get_entity_component< Position >( e.id() ) == nullptr );
+  // Releasing everything must hand the ids back in FIFO order, because the
+  // allocation order is part of the observable behaviour.
+  for ( int i = 0; i < count; ++i ) {
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access): ids holds count entries
+    REQUIRE( r.allocate().id() == ids[ static_cast< size_t >( i ) ] );
   }
 }
 
-TEST_CASE( "systems" ) {
+TEST_CASE( "double_release_is_ignored", "[integration]" ) {
+  ecs::registry r;
+
+  const auto first = r.allocate();
+  const auto second = r.allocate();
+
+  r.deallocate( first );
+  r.deallocate( first ); // must not queue the id twice
+  r.deallocate( second );
+
+  REQUIRE( r.allocate().id() == first.id() );
+  REQUIRE( r.allocate().id() == second.id() );
+}
+
+TEST_CASE( "released_entities_lose_their_components", "[integration]" ) {
+  ecs::registry r;
+
+  auto e = r.allocate();
+  e.add< Position >( 1.0f, 2.0f );
+
+  r.deallocate( e );
+
+  const ecs::components_storage* cs = &r.components();
+  REQUIRE( cs->get_entity_component< Position >( e.id() ) == nullptr );
+}
+
+TEST_CASE( "systems", "[integration]" ) {
   SECTION( "register" ) {
     ecs::registry r;
     r.add_system< System >();
@@ -167,7 +165,7 @@ TEST_CASE( "systems" ) {
 // was never added as a system has an id the vector of systems never grew to, so
 // building the tree used to index past its end. The dependency is ignored, and
 // the update must complete.
-TEST_CASE( "system_dependency_on_unregistered_system" ) {
+TEST_CASE( "system_dependency_on_unregistered_system", "[integration][regression]" ) {
   SECTION( "ignored" ) {
     ecs::registry r;
     r.add_system< System >().depends_on< UnregisteredSystem >();
@@ -188,42 +186,40 @@ TEST_CASE( "system_dependency_on_unregistered_system" ) {
 // The checks below go through type_id() rather than hard-coded positions: a
 // system id depends on how many system types were registered before it, so
 // assuming a particular index makes the test depend on unrelated test cases.
-TEST_CASE( "system_activity" ) {
-  SECTION( "registered_system_is_active" ) {
-    ecs::registry r;
-    r.add_system< System >();
+TEST_CASE( "registered_system_is_active", "[integration][regression][d2]" ) {
+  ecs::registry r;
+  r.add_system< System >();
 
-    const auto sid = ecs::type_collection< ecs::systems >::type_id< System >();
+  const auto sid = ecs::type_collection< ecs::systems >::type_id< System >();
 
-    REQUIRE( r.is_system_active( sid ) == true );
-  }
-
-  SECTION( "disabled_system_is_inactive" ) {
-    ecs::registry r;
-    r.add_system< System >();
-
-    const auto sid = ecs::type_collection< ecs::systems >::type_id< System >();
-
-    r.get_system< System >().disable();
-
-    REQUIRE( r.is_system_active( sid ) == false );
-  }
-
-  SECTION( "system_after_the_end_is_inactive" ) {
-    ecs::registry r;
-    r.add_system< System >();
-
-    // Every id at or above the vector size used to be read out of bounds: the
-    // check was `size() < sid`, so `sid == size()` took the branch and
-    // dereferenced m_systems[size()]. The size is not part of the public surface,
-    // so the test asserts the observable contract instead: ids far beyond any
-    // registered system are inactive, and asking does not read past the end.
-    REQUIRE( r.is_system_active( 64 ) == false );
-    REQUIRE( r.is_system_active( 1024 ) == false );
-  }
+  REQUIRE( r.is_system_active( sid ) == true );
 }
 
-TEST_CASE( "events" ) {
+TEST_CASE( "disabled_system_is_inactive", "[integration][regression][d2]" ) {
+  ecs::registry r;
+  r.add_system< System >();
+
+  const auto sid = ecs::type_collection< ecs::systems >::type_id< System >();
+
+  r.get_system< System >().disable();
+
+  REQUIRE( r.is_system_active( sid ) == false );
+}
+
+TEST_CASE( "system_after_the_end_is_inactive", "[integration][regression][d2]" ) {
+  ecs::registry r;
+  r.add_system< System >();
+
+  // Every id at or above the vector size used to be read out of bounds: the
+  // check was `size() < sid`, so `sid == size()` took the branch and
+  // dereferenced m_systems[size()]. The size is not part of the public surface,
+  // so the test asserts the observable contract instead: ids far beyond any
+  // registered system are inactive, and asking does not read past the end.
+  REQUIRE( r.is_system_active( 64 ) == false );
+  REQUIRE( r.is_system_active( 1024 ) == false );
+}
+
+TEST_CASE( "events", "[integration]" ) {
   SECTION( "delivered_to_subscriber" ) {
     ecs::registry r;
     r.add_system< CountingSystem >().handles< Event >();
@@ -255,7 +251,7 @@ TEST_CASE( "events" ) {
 
 // Coverage for the dependency tree itself: a system that depends on another must
 // run after it, which is the observable effect of the graph the registry builds.
-TEST_CASE( "system_dependencies" ) {
+TEST_CASE( "system_dependencies", "[integration]" ) {
   SECTION( "dependency_runs_first" ) {
     ecs::registry r;
     r.add_system< TaggedSystem< 1 > >().depends_on< TaggedSystem< 2 > >();
@@ -330,7 +326,7 @@ TEST_CASE( "system_dependencies" ) {
 // A handle is copyable and movable, and every copy refers to the same entity in
 // the same registry. The operations themselves are defaulted, so what is worth
 // pinning is the behaviour a user sees.
-TEST_CASE( "entity_handles" ) {
+TEST_CASE( "entity_handles", "[unit]" ) {
   SECTION( "copies_refer_to_the_same_entity" ) {
     ecs::registry r;
     auto original = r.allocate();
@@ -389,7 +385,7 @@ TEST_CASE( "entity_handles" ) {
 //
 //   build/tests-only/tests/registry.exe "[slow]"
 //   python tools/coverage.py --slow
-TEST_CASE( "entity_id_space_exhaustion", "[slow]" ) {
+TEST_CASE( "entity_id_space_exhaustion", "[unit][slow]" ) {
   ecs::registry r;
 
   const auto limit = static_cast< size_t >( ecs::entity::bad_id );

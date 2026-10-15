@@ -108,13 +108,15 @@ include( Catch )
 foreach ( target ${tests} )
   catch_discover_tests( ${target}
     # [slow] cases are left out of the default set: exhausting the entity id space
-    # takes about fifteen seconds, and the rest of the suite takes a fraction of
-    # one. Run them deliberately - the case says how.
+    # takes about a minute, and the rest of the suite takes a fraction of one. Run
+    # them deliberately - the case says how.
     TEST_SPEC "~[slow]"
     # Names are prefixed with the binary: "init" exists in more than one file.
     TEST_PREFIX ${target}.
+    # A case's tags become its CTest labels, which is what makes selection by
+    # purpose possible: `ctest -L unit`, `ctest -L regression`, `ctest -L d1`.
+    ADD_TAGS_AS_LABELS
     PROPERTIES
-      LABELS ${target}
       # A case that hangs must not hang the run; the suite takes milliseconds
       # today, so the limit is generous rather than tight.
       TIMEOUT 60

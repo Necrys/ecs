@@ -43,7 +43,7 @@ int Counted::live = 0;
 
 }
 
-TEST_CASE( "init" ) {
+TEST_CASE( "init", "[unit]" ) {
   SECTION( "default" ) {
     ecs::sparse_vector< int > v;
 
@@ -53,7 +53,7 @@ TEST_CASE( "init" ) {
   }
 }
 
-TEST_CASE( "modify" ) {
+TEST_CASE( "modify", "[unit]" ) {
   SECTION( "insert" ) {
     ecs::sparse_vector< int > v;
 
@@ -218,7 +218,7 @@ TEST_CASE( "modify" ) {
   }
 }
 
-TEST_CASE( "access" ) {
+TEST_CASE( "access", "[unit]" ) {
   SECTION( "get_unsafe" ) {
     ecs::sparse_vector< int > v;
     v.emplace( 0, 666 );
@@ -264,7 +264,7 @@ TEST_CASE( "access" ) {
   }
 }
 
-TEST_CASE( "utility" ) {
+TEST_CASE( "utility", "[unit]" ) {
   SECTION( "reserve" ) {
     ecs::sparse_vector< int > v;
     v.reserve( 1000 );
@@ -331,7 +331,7 @@ TEST_CASE( "utility" ) {
   }
 }
 
-TEST_CASE( "each" ) {
+TEST_CASE( "each", "[unit]" ) {
   SECTION( "visits_every_element_in_slot_order" ) {
     ecs::sparse_vector< int > v;
     v.emplace( 4, 40 );
@@ -371,7 +371,7 @@ TEST_CASE( "each" ) {
   }
 }
 
-TEST_CASE( "element_lifetime" ) {
+TEST_CASE( "element_lifetime", "[unit][regression][d3]" ) {
   SECTION( "destructor_destroys_elements" ) {
     REQUIRE( Counted::live == 0 );
 
@@ -413,72 +413,71 @@ TEST_CASE( "element_lifetime" ) {
   }
 }
 
-// The page keeps its slots in a fixed order and records where each position
-// lives, so inserting or removing inside a page shuffles both the objects and
-// that record. Getting the two out of step used to surface as a position holding
-// a value that belonged to another one, and as two objects destroyed for a
-// single removal.
-//
-// The check below is driven purely through the public interface and asserts what
-// a caller can observe: which positions exist and what they hold.
-TEST_CASE( "page_slot_bookkeeping" ) {
-  SECTION( "positions_stay_paired_with_their_values" ) {
-    struct Step {
-      bool insert;
-      size_t pos;
-      int value;
-    };
+// Every position in the page must agree with what the test expects: the slots
+// that exist, the values they hold, and the number of live objects. Kept out of
+// the case body so that the case reads as the sequence of steps it is.
+void require_page_matches(
+  ecs::sparse_vector< Counted >& v, const std::map< size_t, int >& expected, const size_t highest
+) {
+  REQUIRE( Counted::live == static_cast< int >( expected.size() ) );
 
-    // Ascending first, then filling the gaps backwards, which lands insertions
-    // and removals in the middle of the page rather than at its end.
-    const std::vector< Step > steps = {
-      { true, 8, 100 }, { true, 10, 300 }, { true, 9, 200 }, { false, 8, 0 },   { true, 12, 500 }, { false, 10, 0 },
-      { true, 8, 400 }, { true, 11, 600 }, { false, 9, 0 },  { true, 10, 700 }, { false, 12, 0 },  { true, 13, 800 },
-    };
-
-    const size_t highest = 16;
-
-    ecs::sparse_vector< Counted > v;
-    std::map< size_t, int > expected;
-
-    for ( const auto& step : steps ) {
-      if ( step.insert ) {
-        v.emplace( step.pos, step.value );
-        expected[ step.pos ] = step.value;
-      } else {
-        v.erase( step.pos );
-        expected.erase( step.pos );
-      }
-
-      for ( size_t pos = 0; pos < highest; ++pos ) {
-        CAPTURE( pos, step.pos );
-        REQUIRE( v.exist( pos ) == ( expected.count( pos ) != 0 ) );
-        if ( expected.count( pos ) != 0 ) {
-          REQUIRE( v.get_unsafe( pos ).value == expected.at( pos ) );
-        }
-      }
-
-      REQUIRE( Counted::live == static_cast< int >( expected.size() ) );
+  for ( size_t pos = 0; pos < highest; ++pos ) {
+    CAPTURE( pos );
+    REQUIRE( v.exist( pos ) == ( expected.count( pos ) != 0 ) );
+    if ( expected.count( pos ) != 0 ) {
+      REQUIRE( v.get_unsafe( pos ).value == expected.at( pos ) );
     }
   }
+}
 
-  SECTION( "empty_page_after_removals" ) {
-    ecs::sparse_vector< Counted > v;
+TEST_CASE( "page_positions_stay_paired_with_their_values", "[unit][regression][d15]" ) {
+  struct Step {
+    bool insert;
+    size_t pos;
+    int value;
+  };
 
-    v.emplace( 3, 10 );
-    v.emplace( 5, 20 );
-    v.emplace( 4, 30 );
+  // Ascending first, then filling the gaps backwards, which lands insertions
+  // and removals in the middle of the page rather than at its end.
+  const std::vector< Step > steps = {
+    { true, 8, 100 }, { true, 10, 300 }, { true, 9, 200 }, { false, 8, 0 },   { true, 12, 500 }, { false, 10, 0 },
+    { true, 8, 400 }, { true, 11, 600 }, { false, 9, 0 },  { true, 10, 700 }, { false, 12, 0 },  { true, 13, 800 },
+  };
 
-    REQUIRE( Counted::live == 3 );
+  const size_t highest = 16;
 
-    v.erase( 3 );
-    v.erase( 4 );
-    v.erase( 5 );
+  ecs::sparse_vector< Counted > v;
+  std::map< size_t, int > expected;
 
-    // Every position gone, so the page is released and nothing survives it.
-    REQUIRE( Counted::live == 0 );
-    REQUIRE( v.exist( 3 ) == false );
-    REQUIRE( v.exist( 4 ) == false );
-    REQUIRE( v.exist( 5 ) == false );
+  for ( const auto& step : steps ) {
+    if ( step.insert ) {
+      v.emplace( step.pos, step.value );
+      expected[ step.pos ] = step.value;
+    } else {
+      v.erase( step.pos );
+      expected.erase( step.pos );
+    }
+
+    require_page_matches( v, expected, highest );
   }
+}
+
+TEST_CASE( "page_is_released_when_its_last_position_goes", "[unit][regression][d15]" ) {
+  ecs::sparse_vector< Counted > v;
+
+  v.emplace( 3, 10 );
+  v.emplace( 5, 20 );
+  v.emplace( 4, 30 );
+
+  REQUIRE( Counted::live == 3 );
+
+  v.erase( 3 );
+  v.erase( 4 );
+  v.erase( 5 );
+
+  // Every position gone, so the page is released and nothing survives it.
+  REQUIRE( Counted::live == 0 );
+  REQUIRE( v.exist( 3 ) == false );
+  REQUIRE( v.exist( 4 ) == false );
+  REQUIRE( v.exist( 5 ) == false );
 }
