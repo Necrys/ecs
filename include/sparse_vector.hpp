@@ -219,21 +219,42 @@ T& sparse_vector< T, PageSize >::page::emplace( const size_t pos, Args&&... args
   return *reinterpret_cast< T* >( m_data + m_index[ pos ] );
 }
 
+// Page invariants, all in slot order:
+//
+//   * m_data[0 .. m_size) holds exactly the live objects, with no gaps, so the
+//     destructor can destroy that range and nothing else;
+//   * m_back_index[slot] is the position stored in that slot, and the sequence
+//     increases with the slot;
+//   * m_index[position] is the slot holding that position, or bad_index.
+//
+// Everything below is written against those three rules. Mixing the object move
+// with the bookkeeping is what made the previous version destroy the wrong
+// number of elements: the two do not walk the same range.
 template < typename T, size_t PageSize >
 void sparse_vector< T, PageSize >::page::erase( const size_t pos ) {
   assert( pos < PageSize );
 
-  if ( m_index[ pos ] == bad_index ) {
+  const size_t slot = m_index[ pos ];
+  if ( slot == bad_index ) {
     return;
   }
 
-  reinterpret_cast< T* >( m_data + m_index[ pos ] )->~T();
+  reinterpret_cast< T* >( m_data + slot )->~T();
 
-  for ( size_t i = m_index[ pos ] + 1; i < m_size; ++i ) {
-    *reinterpret_cast< T* >( m_data + ( i - 1 ) ) = std::move( *reinterpret_cast< T* >( m_data + i ) );
-    reinterpret_cast< T* >( m_data + i )->~T();
-    --m_index[ m_back_index[ i ] ];
-    m_back_index[ i - 1 ] = m_back_index[ i ];
+  // Pull the following elements down one slot so that the hole ends up on top of
+  // the live range. Constructing into the slot that was just released is what
+  // keeps one live object per slot; assigning onto a live object would leave the
+  // old value neither released nor accounted for.
+  for ( size_t i = slot; i + 1 < m_size; ++i ) {
+    new ( &m_data[ i ] ) T( std::move( *reinterpret_cast< T* >( m_data + ( i + 1 ) ) ) );
+    reinterpret_cast< T* >( m_data + ( i + 1 ) )->~T();
+  }
+
+  // The bookkeeping covers one slot less than the live range: the entry that
+  // fell off the top is simply dropped.
+  for ( size_t i = slot; i + 1 < m_size; ++i ) {
+    m_back_index[ i ] = m_back_index[ i + 1 ];
+    m_index[ m_back_index[ i ] ] = i;
   }
 
   m_index[ pos ] = bad_index;
@@ -308,38 +329,40 @@ void sparse_vector< T, PageSize >::page::take_place( const size_t pos, Args&&...
   assert( pos < PageSize );
   assert( m_index[ pos ] == bad_index );
 
-  if ( m_size == 0 || m_back_index[ m_size - 1 ] < pos ) {
-    // inserting at end, fast way
-    m_index[ pos ] = m_size;
-    m_back_index[ m_size ] = pos;
-    new( &m_data[ m_size++ ] ) T( std::forward< Args >( args )... );
-  } else {
-    size_t next = bad_index;
-    for ( size_t i = pos; i < PageSize; ++i ) {
-      if ( m_index[ i ] != bad_index ) {
-        next = i;
-        break;
-      }
-    }
+  // The first slot whose position is above pos, which is exactly where pos
+  // belongs: the positions are kept increasing along the slots.
+  const size_t end_idx = static_cast< size_t >(
+    std::lower_bound( &m_back_index[ 0 ], &m_back_index[ m_size ], pos ) - &m_back_index[ 0 ] );
 
-    assert( next != bad_index );
-
-    m_index[ pos ] = m_index[ next ];
-
-    // shift elements
-    size_t endIdx = m_index[ next ];
-    for ( size_t i = m_size; i > endIdx; --i ) {
-      *reinterpret_cast< T* >( m_data + i ) = std::move( *reinterpret_cast< T* >( m_data + ( i - 1 ) ) );
-      reinterpret_cast< T* >( m_data + ( i - 1 ) )->~T();
-      ++m_index[ m_back_index[ i - 1 ] ];
-      m_back_index[ i ] = m_back_index[ i - 1 ];
-    }
-
-    m_back_index[ m_index[ pos ] ] = pos;
-
-    new( &m_data[ m_index[ pos ] ] ) T( std::forward< Args >( args )... );
-    ++m_size;
+  // Make room in the bookkeeping first, so that the shifts below read the old
+  // values and write the new ones without an intermediate buffer. The uppermost
+  // entry, m_back_index[ m_size ], is dead: it is written before it is read, and
+  // the slot above m_size holds no object.
+  for ( size_t i = m_size; i > end_idx; --i ) {
+    m_back_index[ i ] = m_back_index[ i - 1 ];
   }
+
+  m_back_index[ end_idx ] = pos;
+
+  for ( size_t i = end_idx + 1; i <= m_size; ++i ) {
+    m_index[ m_back_index[ i ] ] = i;
+  }
+
+  m_index[ pos ] = end_idx;
+
+  // Move the objects right, starting from the top so that every source is still
+  // intact when it is read. The slot released by each step is reused by the next
+  // one, and the release only happens after the value has been moved out, so
+  // every slot holds exactly one live object throughout.
+  for ( size_t i = m_size; i > end_idx; --i ) {
+    new ( &m_data[ i ] ) T( std::move( *reinterpret_cast< T* >( m_data + ( i - 1 ) ) ) );
+    reinterpret_cast< T* >( m_data + ( i - 1 ) )->~T();
+  }
+
+  // The slot at end_idx was released by the last step and now holds no object.
+  new ( &m_data[ end_idx ] ) T( std::forward< Args >( args )... );
+
+  ++m_size;
 }
 
 }
