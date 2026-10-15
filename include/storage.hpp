@@ -85,10 +85,10 @@ void components_storage::join_impl( const eid_t id, Ft&& f, Rs&&... rs ) {
 
 template < typename... Ts, typename Ft >
 void components_storage::join( Ft&& f ) {
-  eid_t min_index( std::numeric_limits< eid_t >::max() ), max_index( 0 );
-  get_index_range< Ts... >( min_index, max_index );
+  eid_t min_index = 0;
+  eid_t max_index = 0;
 
-  if ( min_index == std::numeric_limits< eid_t >::max() ) {
+  if ( !get_index_range< Ts... >( min_index, max_index ) ) {
     return;
   }
 
@@ -97,26 +97,51 @@ void components_storage::join( Ft&& f ) {
   }
 }
 
+// Returns false when none of the requested components has a single element, in
+// which case there is nothing to iterate at all. The bounds are reported through
+// a bool rather than a sentinel value: index_range() works in size_t and its
+// "no index" marker does not survive the narrowing to eid_t.
 template < class T >
-void components_storage::get_index_range( eid_t& min_index, eid_t& max_index ) {
+bool components_storage::get_index_range( eid_t& min_index, eid_t& max_index ) {
   const auto storage = get_storage< T >();
-  if ( storage ) {
-    const auto range = storage->index_range();
-    min_index = min_index > range.first ? range.first : min_index;
-    max_index = max_index < range.second ? range.second : max_index;
+  if ( !storage ) {
+    return false;
   }
+
+  const auto range = storage->index_range();
+  if ( range.first == sparse_vector< T >::bad_index ) {
+    return false;
+  }
+
+  min_index = static_cast< eid_t >( range.first );
+  max_index = static_cast< eid_t >( range.second );
+  return true;
 }
 
 template < class T, class... Rs >
-typename std::enable_if< sizeof...( Rs ) != 0 >::type components_storage::get_index_range( eid_t& min_index, eid_t& max_index ) {
+typename std::enable_if< sizeof...( Rs ) != 0, bool >::type components_storage::get_index_range( eid_t& min_index, eid_t& max_index ) {
   const auto storage = get_storage< T >();
-  if ( storage ) {
-    const auto range = storage->index_range();
-    min_index = min_index > range.first ? range.first : min_index;
-    max_index = max_index < range.second ? range.second : max_index;
+
+  if ( !storage ) {
+    return get_index_range< Rs... >( min_index, max_index );
   }
 
-  get_index_range< Rs... >( min_index, max_index );
+  const auto range = storage->index_range();
+  if ( range.first == sparse_vector< T >::bad_index ) {
+    return get_index_range< Rs... >( min_index, max_index );
+  }
+
+  min_index = static_cast< eid_t >( range.first );
+  max_index = static_cast< eid_t >( range.second );
+
+  eid_t other_min = 0;
+  eid_t other_max = 0;
+  if ( get_index_range< Rs... >( other_min, other_max ) ) {
+    min_index = min_index > other_min ? other_min : min_index;
+    max_index = max_index < other_max ? other_max : max_index;
+  }
+
+  return true;
 }
 
 template < typename... Ts >
@@ -166,8 +191,12 @@ components_storage::join_exclude_wrapper< Ts... >::join_exclude_wrapper( compone
 template < typename... Ts >
 template < typename... TsEx, typename Ft >
 void components_storage::join_exclude_wrapper< Ts... >::exclude( Ft&& func ) {
-  eid_t min_index( std::numeric_limits< eid_t >::max() ), max_index( 0 );
-  m_storage.get_index_range< Ts... >( min_index, max_index );
+  eid_t min_index = 0;
+  eid_t max_index = 0;
+
+  if ( !m_storage.get_index_range< Ts... >( min_index, max_index ) ) {
+    return;
+  }
 
   for ( eid_t i = min_index; i <= max_index; ++i ) {
     exclude_impl< TsEx... >( i, std::forward< Ft >( func ) );

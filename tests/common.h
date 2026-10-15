@@ -27,6 +27,15 @@ struct Velocity {
 struct Event {
 };
 
+// A second value component, used where a test needs two independent storages.
+struct Tag {
+  int value;
+
+  Tag() {}
+  Tag( const int v ):
+    value( v ) {}
+};
+
 class System {
 public:
   void update() {

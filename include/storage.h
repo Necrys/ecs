@@ -87,10 +87,10 @@ namespace ecs {
     void join_impl( const eid_t id, Ft&& f, Rs&&... rs );
 
     template < class T >
-    void get_index_range( eid_t& min_index, eid_t& max_index );
+    bool get_index_range( eid_t& min_index, eid_t& max_index );
 
     template < class T, class... Rs >
-    typename std::enable_if< sizeof...( Rs ) != 0 >::type get_index_range( eid_t& min_index, eid_t& max_index );
+    typename std::enable_if< sizeof...( Rs ) != 0, bool >::type get_index_range( eid_t& min_index, eid_t& max_index );
 
     std::vector< sparse_vector_base* > m_componentStorages;
   };

@@ -198,3 +198,90 @@ SECTION( "join_exclude" ) {
 
 
 }
+
+// Regression coverage for the join/exclude bounds handling.
+//
+// index_range() reports "no index" with a size_t sentinel, which does not
+// survive the narrowing to eid_t used by the iteration bounds. The sentinel used
+// to turn into UINT32_MAX, the early-out check stopped matching, and the loop
+// `for ( eid_t i = UINT32_MAX; i <= 0; ++i )` wrapped around and ran for
+// billions of iterations. A storage that exists but is empty is a normal state:
+// it happens as soon as every entity with that component is destroyed.
+TEST_CASE( "join_bounds" ) {
+
+SECTION( "component_never_registered" ) {
+  ecs::components_storage s;
+  s.add_entity_component< Position >( 200, 1.0f, 2.0f );
+  s.add_entity_component< Position >( 201, 3.0f, 4.0f );
+
+  size_t called = 0;
+  s.join< Position, Velocity >( [ & ]( const ecs::eid_t, const Position&, const Velocity& ) {
+    ++called;
+  } );
+
+  REQUIRE( called == 0 );
+}
+
+SECTION( "component_storage_exists_but_is_empty" ) {
+  ecs::components_storage s;
+  s.add_entity_component< Position >( 200, 1.0f, 2.0f );
+  s.add_entity_component< Velocity >( 5, 1.0f, 1.0f );
+
+  // Emptying the storage deletes its page, so index_range() reports no index
+  // while the storage itself still exists. This is the case that used to hang.
+  s.remove_entity_component< Velocity >( 5 );
+
+  size_t called = 0;
+  s.join< Position, Velocity >( [ & ]( const ecs::eid_t, const Position&, const Velocity& ) {
+    ++called;
+  } );
+
+  REQUIRE( called == 0 );
+}
+
+SECTION( "empty_storage_does_not_disturb_a_valid_join" ) {
+  ecs::components_storage s;
+  s.add_entity_component< Position >( 200, 1.0f, 2.0f );
+  s.add_entity_component< Position >( 201, 3.0f, 4.0f );
+  s.add_entity_component< Tag >( 200, 5 );
+
+  s.add_entity_component< Velocity >( 7, 1.0f, 1.0f );
+  s.remove_entity_component< Velocity >( 7 );
+
+  size_t called = 0;
+  s.join< Position, Tag >( [ & ]( const ecs::eid_t, const Position&, const Tag& ) {
+    ++called;
+  } );
+
+  REQUIRE( called == 1 );
+}
+
+SECTION( "exclude_with_empty_storage_terminates" ) {
+  ecs::components_storage s;
+  s.add_entity_component< Position >( 200, 1.0f, 2.0f );
+
+  s.add_entity_component< Velocity >( 7, 1.0f, 1.0f );
+  s.remove_entity_component< Velocity >( 7 );
+
+  size_t called = 0;
+  s.join< Position >().exclude< Velocity >( [ & ]( const ecs::eid_t, const Position& ) {
+    ++called;
+  } );
+
+  // Nothing is excluded because the Velocity storage is empty, so the single
+  // Position entity must be visited.
+  REQUIRE( called == 1 );
+}
+
+SECTION( "exclude_on_empty_base_storage" ) {
+  ecs::components_storage s;
+
+  size_t called = 0;
+  s.join< Position >().exclude< Velocity >( [ & ]( const ecs::eid_t, const Position& ) {
+    ++called;
+  } );
+
+  REQUIRE( called == 0 );
+}
+
+}
