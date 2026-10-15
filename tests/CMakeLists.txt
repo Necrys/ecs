@@ -96,15 +96,23 @@ foreach ( target ${tests} )
 endforeach ()
 
 # -----------------------------------------------------------------------------
-# CTest registration
+# CTest registration: one test per Catch2 TEST_CASE, not one per binary. A failure
+# names the case that failed instead of the file it lives in, cases can be
+# selected by name or tag, and CTest can run and time them individually.
+# Discovery asks the binary for its case list once, after it is built.
 #
 # enable_testing() is called by the top-level CMakeLists.txt.
-#
-# No PASS_REGULAR_EXPRESSION on purpose: Catch2 writes its summary to stderr, so
-# a pass pattern is never matched and every test would be reported as failed. The
-# exit code is the verdict, and [!mayfail] keeps the known layout defect from
-# turning that code non-zero.
 # -----------------------------------------------------------------------------
+include( Catch )
+
 foreach ( target ${tests} )
-  add_test ( NAME ${target} COMMAND ${target} )
+  catch_discover_tests( ${target}
+    # Names are prefixed with the binary: "init" exists in more than one file.
+    TEST_PREFIX ${target}.
+    PROPERTIES
+      LABELS ${target}
+      # A case that hangs must not hang the run; the suite takes milliseconds
+      # today, so the limit is generous rather than tight.
+      TIMEOUT 60
+  )
 endforeach ()
