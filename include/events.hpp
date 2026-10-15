@@ -4,8 +4,8 @@ namespace ecs {
 
 template < typename E >
 event_handler< E >::event_handler( registry& r ):
-  m_registry( r ),
-  m_current( 0 ) {
+  m_current( 0 ),
+  m_registry( r ) {
 }
 
 template < typename E >
