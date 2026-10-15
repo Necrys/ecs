@@ -193,6 +193,12 @@ verification material, not part of the library; they are nevertheless never part
 of a test run (see below). The build modules live under `tools/` because they
 describe how the project is built and checked, not what the library contains.
 
+`.github/workflows/ci.yml` is the one directory the layout does not choose for
+itself: GitHub looks for workflows in that path and nowhere else. It builds and
+tests the library on Linux (clang 22 and GCC 14) and Windows (MSVC), publishes the
+reports as run artefacts, and leaves the Raspberry Pi boards to the local, manual
+procedure they already have.
+
 ---
 
 ## Building and running tests
@@ -232,8 +238,8 @@ ordinary shell. Everything is also reachable by hand:
 | Formatting | `python tools/format.py --check` (all files) or `--staged` (what is about to be committed); clang-format 22 is pinned, `--any-version` overrides it with a warning |
 | Warnings | `-DECS_WARNINGS_AS_ERRORS=ON` is the default; `OFF` prints the whole list instead of stopping |
 | Sanitizers | `cmake --preset msvc-asan` on Windows. Elsewhere `-DECS_ENABLE_ASAN=ON -DECS_ENABLE_UBSAN=ON`; `ECS_ENABLE_TSAN` exists for the day there are threads |
-| Coverage | `python tools/coverage.py` builds the `coverage` preset, runs the tests instrumented, merges the profiles and checks the floor; `--uncovered` lists the lines no test reaches, `--html DIR` writes a report |
-| clang-tidy | `cmake --preset tidy` produces a compile database, then `clang-tidy -p build/tidy <file>`; the checks and the reasons for what is off are in `.clang-tidy`. Findings are errors: the report is empty and stays that way, so a new finding is either fixed or the check is disabled there with a reason |
+| Coverage | `python tools/coverage.py` builds the platform's coverage preset, runs the tests instrumented, merges the profiles and checks the floor; `--uncovered` lists the lines no test reaches, `--html DIR` writes a report, `--summary FILE` writes the numbers as a markdown block |
+| clang-tidy | `cmake --preset tidy` produces a compile database, then `clang-tidy -p build/tidy <file>`; on Linux the same step is the `linux-tidy` preset and `tools/check.py --tidy` picks whichever fits the platform. The checks and the reasons for what is off are in `.clang-tidy`. Findings are errors: the report is empty and stays that way, so a new finding is either fixed or the check is disabled there with a reason |
 | Tests | `ctest --test-dir build/<preset> --output-on-failure`. Every Catch2 `TEST_CASE` is a separate CTest test named `<file>.<case>`, so `ctest -R registry.entity` runs one of them. A case's tags are its CTest labels: `ctest -L unit`, `-L integration`, `-L regression`, `-L "^d1$"` for a defect. Cases tagged `[slow]` are part of the set - exhausting the entity id space takes about 15 s in Release and 67 s in Debug, so `ctest -LE slow` is the tight loop when that minute matters |
 
 Sanitizers on Windows come from MSVC only: clang's ASan runtime dies in
@@ -347,4 +353,5 @@ rationale live separately from the code and do not go into the repository.
 | What is built and how | `CMakeLists.txt`, `README.md` |
 | How to format | `tools/format.ps1` (Windows), `tools/format.py` (anywhere), `.clang-format` |
 | How to benchmark, and how to read a result | `tests/bench/README.md` |
+| What CI runs, and how to reproduce it | `.github/workflows/ci.yml`; locally `python tools/check.py --full` plus `python tools/coverage.py` |
 | API entry points | `lib/include/registry.h`, `lib/include/entity.h`, `lib/include/storage.h` |

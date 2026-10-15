@@ -44,6 +44,10 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SYSTEMS = {0: "ok", 1: "check failed", 2: "environment problem"}
 
+# The compile-database configuration differs per platform only in the compiler
+# driver: clang-cl on Windows, clang elsewhere. See tools/CMakePresets.json.
+TIDY_PRESET = "tidy" if os.name == "nt" else "linux-tidy"
+
 if os.name == "nt":
     # CTest sometimes loses characters through the legacy console code page, and
     # Catch2 prints the assertion text - which is where a failure is explained.
@@ -210,7 +214,19 @@ def build_tree(shell: Shell, preset: str, build_dir: Path, reconfigure: bool = F
 
 def step_tests(shell: Shell, build_dir: Path) -> bool:
     say("== tests")
-    result = shell.run(["ctest", "--test-dir", str(build_dir), "--output-on-failure"])
+    # JUnit is written next to the build tree on every run: it costs nothing here
+    # and it is what a CI job publishes, so the local gate produces the same
+    # artefact the runner would.
+    result = shell.run(
+        [
+            "ctest",
+            "--test-dir",
+            str(build_dir),
+            "--output-on-failure",
+            "--output-junit",
+            str(build_dir / "junit.xml"),
+        ]
+    )
     if result.returncode != 0:
         say("   FAILED: ctest")
         return False
@@ -297,10 +313,10 @@ def step_tidy(shell: Shell) -> bool:
     if not clang_tidy:
         raise EnvironmentError("clang-tidy was not found. Install LLVM, or set CLANG_TIDY to its path.")
 
-    database = REPO_ROOT / "build" / "tidy"
+    database = REPO_ROOT / "build" / TIDY_PRESET
     if shell.reconfigure or not (database / "CMakeCache.txt").is_file():
-        if shell.run(["cmake", "--preset", "tidy"]).returncode != 0:
-            say("   FAILED: cmake --preset tidy")
+        if shell.run(["cmake", "--preset", TIDY_PRESET]).returncode != 0:
+            say(f"   FAILED: cmake --preset {TIDY_PRESET}")
             return False
 
     compile_commands = database / "compile_commands.json"

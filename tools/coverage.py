@@ -48,7 +48,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from check import Shell, say  # noqa: E402  (the environment handling lives with the other checks)
 
-PRESET = "coverage"
+# The instrumented configuration differs between platforms only in the compiler
+# driver: clang-cl on Windows, clang elsewhere. The flags come from
+# tools/cmake/Coverage.cmake either way, so the tool picks the preset and lets
+# --preset override it.
+DEFAULT_PRESET = "coverage" if os.name == "nt" else "linux-coverage"
+PRESET = DEFAULT_PRESET
 BUILD_DIR = REPO_ROOT / "build" / PRESET
 
 # Nothing under these paths is ours to be measured by the library's number.
@@ -211,17 +216,22 @@ def relative(path: str) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Measure library coverage with clang and llvm-cov.")
+    parser.add_argument("--preset", default=DEFAULT_PRESET,
+                        help=f"configure preset to use (default: {DEFAULT_PRESET})")
     parser.add_argument("--no-build", action="store_true", help="do not configure or build")
     parser.add_argument("--no-tests", action="store_true", help="do not run the tests")
     parser.add_argument("--uncovered", action="store_true", help="list lines no test reaches")
     parser.add_argument("--html", metavar="DIR", help="also write an HTML report there")
-    parser.add_argument("--lcov", metavar="FILE", default=str(BUILD_DIR / "merged.lcov"),
-                        help="where to write the merged lcov tracefile")
+    parser.add_argument("--lcov", metavar="FILE", help="where to write the merged lcov tracefile")
+    parser.add_argument("--summary", metavar="FILE",
+                        help="also write the numbers as a markdown block, for a CI run summary")
     parser.add_argument("--no-threshold", action="store_true", help="report without checking the floor")
     args = parser.parse_args()
 
-    if "clang" not in (os.environ.get("CXX", "") + "clang").lower():
-        pass  # the preset pins clang-cl; nothing to do here, kept for readability
+    # The preset decides the build directory, and everything below follows it.
+    global PRESET, BUILD_DIR
+    PRESET = args.preset
+    BUILD_DIR = REPO_ROOT / "build" / PRESET
 
     llvm_cov = find_llvm_tool("llvm-cov.exe" if os.name == "nt" else "llvm-cov")
     llvm_profdata = find_llvm_tool("llvm-profdata.exe" if os.name == "nt" else "llvm-profdata")
@@ -262,7 +272,14 @@ def main() -> int:
         environment = dict(shell.environment() or os.environ)
         environment["LLVM_PROFILE_FILE"] = str(profiles / "%p-%m.profraw")
         result = subprocess.run(
-            ["ctest", "--test-dir", str(BUILD_DIR), "--output-on-failure"],
+            [
+                "ctest",
+                "--test-dir",
+                str(BUILD_DIR),
+                "--output-on-failure",
+                "--output-junit",
+                str(BUILD_DIR / "junit.xml"),
+            ],
             cwd=REPO_ROOT,
             env=environment,
         )
@@ -342,7 +359,7 @@ def main() -> int:
             f"functions {percent(functions_hit, functions):6.2f}%  branches {percent(branches_hit, branches):6.2f}%"
         )
 
-    lcov_path = Path(args.lcov)
+    lcov_path = Path(args.lcov) if args.lcov else BUILD_DIR / "merged.lcov"
     lcov_path.parent.mkdir(parents=True, exist_ok=True)
     lcov_path.write_text(render_lcov(merged), encoding="utf-8")
     say("")
@@ -378,9 +395,8 @@ def main() -> int:
         else:
             say(f"   {html_dir / 'index.html'}")
 
-    if args.no_threshold:
-        return 0
-
+    # The verdict is part of the report: written before the exit code is decided, so
+    # a run that fails the floor still leaves a summary behind for the dashboard.
     failures = []
     if function_pct + 1e-9 < MIN_FUNCTIONS_PCT:
         failures.append(f"functions {function_pct:.2f}% < {MIN_FUNCTIONS_PCT:.2f}%")
@@ -389,12 +405,52 @@ def main() -> int:
     if branch_pct + 1e-9 < MIN_BRANCHES_PCT:
         failures.append(f"branches {branch_pct:.2f}% < {MIN_BRANCHES_PCT:.2f}%")
 
+    if args.summary:
+        write_summary(
+            Path(args.summary),
+            PRESET,
+            (total_lines, total_lines_hit, line_pct),
+            (total_functions, total_functions_hit, function_pct),
+            (total_branches, total_branches_hit, branch_pct),
+            failures,
+        )
+
+    if args.no_threshold:
+        return 0
+
     if failures:
         say("")
         say("below the floor: " + "; ".join(failures))
         return 1
 
     return 0
+
+
+def write_summary(
+    path: Path,
+    preset: str,
+    lines: tuple[int, int, float],
+    functions: tuple[int, int, float],
+    branches: tuple[int, int, float],
+    failures: list[str],
+) -> None:
+    """Write the numbers as markdown, for a CI run summary."""
+    verdict = (
+        "Below the floor: " + "; ".join(failures)
+        if failures
+        else f"Meets the floor ({MIN_LINES_PCT:.1f}% lines, {MIN_BRANCHES_PCT:.1f}% branches)."
+    )
+    rows = [("Lines", lines), ("Functions", functions), ("Branches", branches)]
+    text = [
+        f"### Coverage ({preset})",
+        "",
+        "| Metric | Covered | Total | Percent |",
+        "| --- | --- | --- | --- |",
+    ]
+    for name, (total, hit, pct) in rows:
+        text.append(f"| {name} | {hit} | {total} | {pct:.2f}% |")
+    text += ["", verdict, ""]
+    path.write_text("\n".join(text), encoding="utf-8")
 
 
 def format_ranges(lines: list[int]) -> str:

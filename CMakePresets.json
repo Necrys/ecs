@@ -64,6 +64,47 @@
       "inherits": "gcc"
     },
     {
+      "name": "linux-clang",
+      "displayName": "Clang on Linux (Debug, tests)",
+      "description": "The clang configuration CI builds and tests. Put LLVM's bin directory on PATH so that clang resolves to the version the project pins; the workflow installs LLVM 22 for exactly that reason.",
+      "inherits": "tests-only",
+      "generator": "Ninja",
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "clang",
+        "CMAKE_CXX_COMPILER": "clang++"
+      }
+    },
+    {
+      "name": "linux-gcc",
+      "displayName": "GCC on Linux (Debug, tests)",
+      "description": "The GCC configuration, with the tests on rather than the benchmarks: gcc-pi is the same toolchain under the preset the boards record their runs with.",
+      "inherits": "tests-only",
+      "generator": "Ninja",
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "gcc",
+        "CMAKE_CXX_COMPILER": "g++"
+      }
+    },
+    {
+      "name": "linux-coverage",
+      "displayName": "Clang on Linux + coverage (Debug, tests)",
+      "description": "Source-based coverage for tools/coverage.py: the same flags as the Windows coverage preset, with clang rather than clang-cl as the driver.",
+      "inherits": "linux-clang",
+      "cacheVariables": {
+        "ECS_ENABLE_COVERAGE": "ON",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+      }
+    },
+    {
+      "name": "linux-tidy",
+      "displayName": "Clang on Linux, compile database (Debug, tests)",
+      "description": "Nothing is compiled here: the configuration exists to produce compile_commands.json for clang-tidy, as the tidy preset does on Windows.",
+      "inherits": "linux-clang",
+      "cacheVariables": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+      }
+    },
+    {
       "name": "tests-only",
       "displayName": "Tests only (no benchmarks)",
       "description": "The configuration used for ordinary development and for the test suite.",
@@ -115,6 +156,10 @@
     { "name": "clang", "configurePreset": "clang" },
     { "name": "gcc", "configurePreset": "gcc" },
     { "name": "gcc-pi", "configurePreset": "gcc-pi" },
+    { "name": "linux-clang", "configurePreset": "linux-clang" },
+    { "name": "linux-gcc", "configurePreset": "linux-gcc" },
+    { "name": "linux-coverage", "configurePreset": "linux-coverage" },
+    { "name": "linux-tidy", "configurePreset": "linux-tidy" },
     { "name": "tests-only", "configurePreset": "tests-only" },
     { "name": "msvc-asan", "configurePreset": "msvc-asan" },
     { "name": "coverage", "configurePreset": "coverage" },

@@ -1,5 +1,7 @@
 # ecs
 
+[![CI](https://github.com/Necrys/ecs/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/Necrys/ecs/actions/workflows/ci.yml)
+
 A small header-heavy **Entity-Component-System** library for C++.
 
 An entity is just an identifier. A component is an ordinary struct holding your
@@ -82,6 +84,29 @@ registered with CTest:
 ```bash
 ctest --test-dir build --output-on-failure
 ```
+
+---
+
+## Continuous integration
+
+Every push to `master` and every pull request is built and tested on `ubuntu-24.04`
+and `windows-2025`:
+
+| Job | What it does |
+|---|---|
+| Linux, clang 22 | formatting; coverage and its floor; the suite in Debug (instrumented) and in Release; clang-tidy |
+| Linux, GCC 14 | the suite in Debug, and again under AddressSanitizer and UndefinedBehaviorSanitizer |
+| Windows, MSVC | the suite in Debug, and again under AddressSanitizer |
+
+The toolchains are installed to match what the project pins rather than taken from
+the image, so a run here and a run locally look at the same tools. The Raspberry Pi
+boards are deliberately absent: no hosted runner has ARMv6 or ARMv7 hardware, and
+their builds and measurements stay local and manual.
+
+Every report is published as an artefact of the run - JUnit XML, the merged lcov
+tracefile, the HTML coverage report - and the run page carries a summary with the
+test counts and the coverage numbers. Nothing is committed back into the
+repository: results are run data, not source.
 
 ---
 
