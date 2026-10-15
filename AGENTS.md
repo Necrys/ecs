@@ -171,11 +171,11 @@ ecs/
 |   |-- events.h/.hpp          event queues
 |   `-- type_enumerator.h      assigns ids to component/system/event types
 |-- src/                   non-template .cpp implementations
-|-- cmake/                 build modules (warning configuration)
+|-- cmake/                 build modules (warnings, sanitizers)
 |-- check/                 the public headers compiled as their own unit
 |-- tests/                 unit tests (Catch2)
 |-- bench/                 benchmarks (off by default, see bench/README.md)
-`-- tools/                 helper scripts (formatting)
+`-- tools/                 helper scripts (formatting, checks)
 ```
 
 File naming convention: `*.h` holds declarations, `*.hpp` holds template and
@@ -204,6 +204,31 @@ v3.16.1 (see `tests/CMakeLists.txt`), so the dependency cannot shift under us.
 `ECS_BUILD_TESTS` is on by default, which means the first configure downloads
 Catch2 and therefore needs network access; use `-DECS_BUILD_TESTS=OFF` for an
 offline library-only build.
+
+### Before a commit: one command that runs the checks
+
+```powershell
+./tools/check.ps1              # formatting of what is staged, build, tests
+./tools/check.ps1 -Full        # the same, plus sanitizers and clang-tidy
+```
+
+`tools/check.py` is the same thing without PowerShell (`tools/check.sh` on
+POSIX), and it loads the compiler environment itself, so it works from an
+ordinary shell. Everything is also reachable by hand:
+
+| What | How |
+|---|---|
+| Formatting | `python tools/format.py --check` (all files) or `--staged` (what is about to be committed) |
+| Warnings | `-DECS_WARNINGS_AS_ERRORS=ON` is the default; `OFF` prints the whole list instead of stopping |
+| Sanitizers | `cmake --preset msvc-asan` on Windows. Elsewhere `-DECS_ENABLE_ASAN=ON -DECS_ENABLE_UBSAN=ON`; `ECS_ENABLE_TSAN` exists for the day there are threads |
+| clang-tidy | `cmake --preset tidy` produces a compile database, then `clang-tidy -p build/tidy <file>`; the checks and the reasons for what is off are in `.clang-tidy` |
+| Tests | `ctest --test-dir build/<preset> --output-on-failure` |
+
+Sanitizers on Windows come from MSVC only: clang's ASan runtime dies in
+`interception_win` here and its UBSan runtime refuses `/MD` objects, so both are
+refused with an explanation rather than half-wired. The module comment in
+`cmake/Sanitizers.cmake` records what was measured. Findings from clang-tidy are
+a report, not a gate: the C++17 review works through them.
 
 ```powershell
 # Windows / MSVC, from the repository root
@@ -269,6 +294,9 @@ any change to `join`, `sparse_vector` or `get_*`.
 3. Run the tests. If functionality was added, add a test; if a defect was fixed,
    add a regression test.
 4. Do not leave commented-out code or debug output behind.
+
+`./tools/check.ps1` does 1-3 in one command, and `-Full` adds the sanitizers and
+clang-tidy. Run it before a commit rather than trusting memory.
 
 ### What not to do
 

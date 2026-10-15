@@ -48,6 +48,10 @@ Testing/
 coverage/
 *.lcov
 
+# Python bytecode (the tools are scripts, not a package)
+__pycache__/
+*.pyc
+
 # Benchmark / scratch output
 *.csv
 *.json
