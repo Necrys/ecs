@@ -26,10 +26,8 @@ TEST_CASE( "insert_returns_the_stored_value", "[unit]" ) {
 
   auto* const vv = s.get_entity_component< Position >( 200 );
 
-  REQUIRE( v.x == p.x );
-  REQUIRE( v.y == p.y );
-  REQUIRE( vv->x == p.x );
-  REQUIRE( vv->y == p.y );
+  REQUIRE( v == p );
+  REQUIRE( *vv == p );
   REQUIRE( &v == vv );
 }
 
@@ -42,10 +40,8 @@ TEST_CASE( "set_replaces_the_value", "[unit]" ) {
 
   auto* const vv = s.get_entity_component< Position >( 200 );
 
-  REQUIRE( v.x == p2.x );
-  REQUIRE( v.y == p2.y );
-  REQUIRE( vv->x == p2.x );
-  REQUIRE( vv->y == p2.y );
+  REQUIRE( v == p2 );
+  REQUIRE( *vv == p2 );
   REQUIRE( &v == vv );
 }
 

@@ -62,6 +62,11 @@ public:
 // Every public operation on one component storage, including both selection
 // forms and the const/non-const halves of the accessors.
 float exercise_storage( ecs::components_storage& storage ) {
+  // The default constructor as well as the two-argument one: clang reports a
+  // constructor nothing calls under -Wunused-member-function, and a header check
+  // that leaves part of the surface uninstantiated is checking less than it looks.
+  const Velocity defaulted;
+
   storage.add_entity_component< Position >( 1, 1.0f, 2.0f );
   storage.add_entity_component< Velocity >( 1, 3.0f, 4.0f );
   storage.set_entity_component< Position >( 1, Position{ 5.0f, 6.0f } );
@@ -87,7 +92,7 @@ float exercise_storage( ecs::components_storage& storage ) {
   storage.remove_entity_component< Velocity >( 1 );
   storage.remove_all_components( 1 );
 
-  return sum;
+  return sum + defaulted.x;
 }
 
 // The registry surface: entities, systems, events and the storage view.
@@ -98,7 +103,7 @@ float exercise_registry() {
   world.components().add_entity_component< Position >( handle.id(), 1.0f, 1.0f );
   world.components().add_entity_component< Tag >( handle.id(), Tag{} );
 
-  world.add_system< Counter >();
+  world.add_system< Counter >().handles< Tick >();
   world.push_event< Tick >( Tick{ 1 } );
   world.update();
 

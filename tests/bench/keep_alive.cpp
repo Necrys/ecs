@@ -1,15 +1,31 @@
-// The out-of-line escape used by bench::keep on MSVC. Declared in harness.hpp and
-// defined here so that it cannot be inlined or reasoned about: the compiler sees
-// only a call with a volatile pointer, which is enough to prevent the value that
-// produced it from being discarded.
+// The harness's own translation unit: the out-of-line escape used by bench::keep on
+// MSVC, and the state the harness keeps between calls.
 //
-// This file is deliberately trivial. It exists so that harness.hpp needs no
-// assembly on MSVC.
-#if defined( _MSC_VER )
-
-// The declaration lives in harness.hpp; including it keeps the two from
-// drifting apart, which is also what the missing-prototype check asks for.
+// bench::keep is declared in harness.hpp and defined here so that it cannot be
+// inlined or reasoned about: the compiler sees only a call with a volatile pointer,
+// which is enough to prevent the value that produced it from being discarded.
+//
+// The two accessors below are declared in harness.hpp and defined here because a
+// mutable object defined in a header has vague linkage, which clang reports under
+// -Wunique-object-duplication - and it is right to: every benchmark binary would
+// carry its own copy of an object the header says is shared.
 #include "harness.hpp"
+
+namespace bench {
+
+uint64_t& last_cycles() {
+  static uint64_t value = 0;
+  return value;
+}
+
+uint64_t& checksum() {
+  static uint64_t value = 0;
+  return value;
+}
+
+} // namespace bench
+
+#if defined( _MSC_VER )
 
 extern "C" void bench_keep_alive( void const volatile* value ) {
   // The write is the whole point: it forces the caller's value into a volatile

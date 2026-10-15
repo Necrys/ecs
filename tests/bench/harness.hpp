@@ -579,10 +579,11 @@ inline void clobber_memory() {
 // Cycles accumulated by the most recent timed run, and the run that reports them.
 // Recorded alongside nanoseconds because they answer different questions: a core
 // that changes frequency moves one without touching the other.
-inline uint64_t& last_cycles() {
-  static uint64_t value = 0;
-  return value;
-}
+//
+// Defined in keep_alive.cpp, the harness's one translation unit: a mutable object
+// defined in a header has vague linkage, which clang reports under
+// -Wunique-object-duplication, and it is right to.
+uint64_t& last_cycles();
 
 // Runs `work` once and returns its duration in milliseconds, accumulating the
 // cycle count into last_cycles(). The value the work produced is fed to the
@@ -764,10 +765,8 @@ inline void print_result( const Result& result ) {
 
 // A checksum is printed at exit. If a benchmark is accidentally optimised away,
 // the checksum stops changing between revisions, which is visible in the log.
-inline uint64_t& checksum() {
-  static uint64_t value = 0;
-  return value;
-}
+// Defined in keep_alive.cpp for the same reason as last_cycles().
+uint64_t& checksum();
 
 inline void mix_into_checksum( const uint64_t value ) {
   checksum() ^= value + 0x9e3779b97f4a7c15ull + ( checksum() << 6 ) + ( checksum() >> 2 );

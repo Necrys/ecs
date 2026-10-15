@@ -15,16 +15,18 @@
 #include <vector>
 
 #if defined( _WIN32 )
-// windows.h defines min and max as macros unless told not to, and the library
-// uses std::numeric_limits< T >::max(). Defining these before the include keeps
-// the library headers compilable in a translation unit that touches Win32.
+// Win32 headers. The defines come first because Windows.h turns min and max into
+// macros, and the library uses std::numeric_limits< T >::max(). The spelling is the
+// one the Windows SDK ships: clang warns under -Wnonportable-system-include-path
+// when the case differs from the file on disk, and MinGW, which spells it lowercase,
+// is out of scope for this project.
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
-#include <windows.h>
+#include <Windows.h>
 #if defined( _MSC_VER )
 #include <intrin.h>
 #endif

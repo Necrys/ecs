@@ -8,13 +8,11 @@
 
 namespace {
 
-// Never added as a system anywhere: it exists so that a dependency can name a
-// type the registry has no slot for.
-class UnregisteredSystem {
-public:
-  void update() {
-  }
-};
+// Never added as a system anywhere: it exists so that a dependency can name a type
+// the registry has no slot for. It deliberately has no system interface - a type
+// that is only ever named as a dependency is not a system, and giving it an update()
+// nothing calls would be exactly the dead code clang reports.
+struct UnregisteredSystem {};
 
 }
 
@@ -256,11 +254,12 @@ TEST_CASE( "system_dependencies", "[integration]" ) {
     ecs::registry r;
     r.add_system< TaggedSystem< 1 > >().depends_on< TaggedSystem< 2 > >();
     r.add_system< TaggedSystem< 2 > >();
-    update_sequence().clear();
+    updates().clear();
 
     r.update();
 
-    REQUIRE( update_sequence() == std::vector< int >{ 2, 1 } );
+    INFO( updates().describe() );
+    REQUIRE( updates().matches( { 2, 1 } ) );
   }
 
   // A disabled dependency never updates, so the dependent system must not wait
@@ -270,14 +269,15 @@ TEST_CASE( "system_dependencies", "[integration]" ) {
     r.add_system< TaggedSystem< 1 > >().depends_on< TaggedSystem< 2 > >();
     r.add_system< TaggedSystem< 2 > >().depends_on< TaggedSystem< 3 > >();
     r.add_system< TaggedSystem< 3 > >();
-    update_sequence().clear();
+    updates().clear();
 
     r.get_system< TaggedSystem< 2 > >().disable();
     r.update();
 
     // 2 is disabled, so it neither waits for 3 nor blocks 1: 3 runs because it
     // is ready, then 1 runs because a disabled dependency counts as satisfied.
-    REQUIRE( update_sequence() == std::vector< int >{ 3, 1 } );
+    INFO( updates().describe() );
+    REQUIRE( updates().matches( { 3, 1 } ) );
   }
 
   SECTION( "re_enabled_dependency_runs_again" ) {
@@ -286,15 +286,17 @@ TEST_CASE( "system_dependencies", "[integration]" ) {
     r.add_system< TaggedSystem< 2 > >();
 
     r.get_system< TaggedSystem< 2 > >().disable();
-    update_sequence().clear();
+    updates().clear();
     r.update();
-    REQUIRE( update_sequence() == std::vector< int >{ 1 } );
+    INFO( updates().describe() );
+    REQUIRE( updates().matches( { 1 } ) );
 
     r.get_system< TaggedSystem< 2 > >().enable();
-    update_sequence().clear();
+    updates().clear();
     r.update();
 
-    REQUIRE( update_sequence() == std::vector< int >{ 2, 1 } );
+    INFO( updates().describe() );
+    REQUIRE( updates().matches( { 2, 1 } ) );
   }
 
   // A dependency whose id is inside the vector but whose slot is empty: the type
@@ -312,14 +314,15 @@ TEST_CASE( "system_dependencies", "[integration]" ) {
     ecs::registry r;
     r.add_system< TaggedSystem< 4 > >();
     r.add_system< TaggedSystem< 1 > >().depends_on< UnregisteredSystem >();
-    update_sequence().clear();
+    updates().clear();
 
     r.update();
 
     // An empty slot imposes no order: the dependency is skipped, so the system
     // that named it is free to run in its own place - here slot 0 comes before
     // slot 4.
-    REQUIRE( update_sequence() == std::vector< int >{ 1, 4 } );
+    INFO( updates().describe() );
+    REQUIRE( updates().matches( { 1, 4 } ) );
   }
 }
 

@@ -399,6 +399,26 @@ TEST_CASE( "element_lifetime", "[unit][regression][d3]" ) {
     REQUIRE( Counted::live == 0 );
   }
 
+  // A stored element is an ordinary object, so both assignments have to work on it
+  // and neither may change how many objects are alive. Counted declares them
+  // explicitly (its move constructor would otherwise delete both), and clang
+  // reports a member function nothing calls - which is how this gap was found.
+  SECTION( "assignment_to_a_stored_element" ) {
+    ecs::sparse_vector< Counted > v;
+    v.emplace( 3, 10 );
+    v.emplace( 5, 20 );
+
+    REQUIRE( Counted::live == 2 );
+
+    v.get_unsafe( 3 ) = v.get_unsafe( 5 );
+    REQUIRE( v.get_unsafe( 3 ).value == 20 );
+    REQUIRE( Counted::live == 2 );
+
+    v.get_unsafe( 5 ) = Counted{ 30 };
+    REQUIRE( v.get_unsafe( 5 ).value == 30 );
+    REQUIRE( Counted::live == 2 );
+  }
+
   SECTION( "erase_last_element_of_page_releases_page" ) {
     ecs::sparse_vector< Counted > v;
     v.emplace( 0, 1 );

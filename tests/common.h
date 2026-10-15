@@ -1,6 +1,8 @@
 #pragma once
 
-#include <vector>
+#include <cstring>
+#include <initializer_list>
+#include <string>
 
 struct Position {
   float x, y;
@@ -12,8 +14,12 @@ struct Position {
     y( _y ) {
   }
 
+  // Bit-exact on purpose, and compared as bytes because of it: what these tests
+  // assert is that a component comes back out of a container exactly as it went in,
+  // and clang is right that == on floats is a trap in general - an epsilon here
+  // would hide a truncating defect instead of catching it.
   bool operator==( const Position& other ) const {
-    return x == other.x && y == other.y;
+    return std::memcmp( this, &other, sizeof( *this ) ) == 0;
   }
 };
 
@@ -28,7 +34,7 @@ struct Velocity {
   }
 
   bool operator==( const Velocity& other ) const {
-    return x == other.x && y == other.y;
+    return std::memcmp( this, &other, sizeof( *this ) ) == 0;
   }
 };
 
@@ -67,12 +73,60 @@ public:
   }
 };
 
-// The order systems ran in, shared by every tag below, so a test can assert on
-// what dependencies did to the sequence.
-inline std::vector< int >& update_sequence() {
-  static std::vector< int > sequence;
-  return sequence;
-}
+// The order systems ran in, shared by every tag below, so a test can assert on what
+// dependencies did to the sequence.
+//
+// The registry constructs its systems itself, so a system has nowhere to record but
+// a shared object - and a shared container in an inline function is what clang's
+// -Wexit-time-destructors and -Wunique-object-duplication are about. A fixed buffer
+// with a count is trivially destructible, and a handful of entries is all these
+// tests ever record.
+class update_log {
+public:
+  static constexpr size_t capacity = 16;
+
+  void clear() {
+    m_count = 0;
+  }
+
+  void add( const int tag ) {
+    if ( m_count < capacity ) {
+      m_entries[ m_count++ ] = tag;
+    }
+  }
+
+  bool matches( const std::initializer_list< int > expected ) const {
+    if ( expected.size() != m_count ) {
+      return false;
+    }
+
+    size_t index = 0;
+    for ( const int tag : expected ) {
+      if ( m_entries[ index++ ] != tag ) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  // What actually ran: a bare `false` from matches() would not say what the order
+  // was instead.
+  std::string describe() const {
+    std::string text = "[";
+    for ( size_t index = 0; index < m_count; ++index ) {
+      text += ( index == 0 ? "" : ", " ) + std::to_string( m_entries[ index ] );
+    }
+    return text + "]";
+  }
+
+private:
+  int m_entries[ capacity ] = {};
+  size_t m_count = 0;
+};
+
+// Defined once, in tests/common.cpp: the object is shared by every system a test
+// registers, and a definition here would give it vague linkage.
+update_log& updates();
 
 // A system that appends its tag to the sequence when it updates. The tag is a
 // template parameter rather than a member because a system has to be a distinct
@@ -81,7 +135,7 @@ template < int Tag >
 class TaggedSystem {
 public:
   void update() {
-    update_sequence().push_back( Tag );
+    updates().add( Tag );
   }
 
   void handle_event( const Event& ) {

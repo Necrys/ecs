@@ -61,7 +61,7 @@ set ( tests
 
 foreach ( target ${tests} )
 
-  add_executable ( ${target} ${target}.cpp )
+  add_executable ( ${target} ${target}.cpp common.cpp )
 
   target_link_libraries ( ${target}
     PRIVATE
