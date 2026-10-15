@@ -17,6 +17,8 @@
 #   modernize-avoid-c-arrays
 #   cppcoreguidelines-pro-bounds-constant-array-index
 #                                         - the page indexes its arrays by slot by design
+#   readability-named-parameter           - an unnamed parameter is how the code says
+#                                           "unused"; naming it would trip -Wunused-parameter
 #
 # Findings are a report for now, not a gate: the C++17 review (plan 2.4) works
 # through them, and the high-signal checks become errors once the list is empty.
@@ -36,7 +38,8 @@ Checks: >-
   -cppcoreguidelines-owning-memory,
   -cppcoreguidelines-avoid-c-arrays,
   -modernize-avoid-c-arrays,
-  -cppcoreguidelines-pro-bounds-constant-array-index
+  -cppcoreguidelines-pro-bounds-constant-array-index,
+  -readability-named-parameter
 
 WarningsAsErrors: ''
 

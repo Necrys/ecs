@@ -20,7 +20,7 @@ namespace ecs {
     system_base();
     virtual ~system_base() = default;
 
-    bool updated();
+    bool updated() const;
 
     virtual void update() = 0;
     void reset_update();
@@ -32,7 +32,9 @@ namespace ecs {
 
     void clear_dependencies();
     
-    void add_dependency( std::shared_ptr< system_base > dep );
+    // By reference: the dependency is copied into the list anyway, and taking the
+    // shared_ptr by value would bump the count on every registration.
+    void add_dependency( const std::shared_ptr< system_base >& dep );
 
     bool ready() const;
 

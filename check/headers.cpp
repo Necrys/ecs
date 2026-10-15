@@ -74,10 +74,10 @@ float exercise_storage( ecs::components_storage& storage ) {
   storage.join< Position >().exclude< Velocity >( [ &sum ]( const ecs::eid_t, const Position& p ) { sum += p.y; } );
 
   const ecs::components_storage& view = storage;
-  if ( const Position* p = view.get_entity_component< Position >( 1 ) ) {
+  if ( const auto* p = view.get_entity_component< Position >( 1 ) ) {
     sum += p->x;
   }
-  if ( Position* p = storage.get_entity_component< Position >( 1 ) ) {
+  if ( auto* p = storage.get_entity_component< Position >( 1 ) ) {
     p->y += 1.0f;
   }
   if ( storage.get_storage< Position >() != nullptr ) {

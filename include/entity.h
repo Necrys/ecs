@@ -13,14 +13,19 @@ namespace ecs {
 
     entity( const eid_t id, registry* owner );
     entity( const entity& e );
-    entity( entity&& e );
+
+    // Copying a handle is cheap and must stay available; moving one cannot throw
+    // and says so, so that containers holding entities move instead of copying.
+    entity( entity&& e ) noexcept;
 
     entity& operator=( const entity& e );
-    entity& operator=( entity&& e );
+    entity& operator=( entity&& e ) noexcept;
 
     eid_t id() const;
 
-    registry* owner();
+    // The registry the handle came from. Const on the handle, not on the
+    // registry: the handle does not own it and may hand it out unchanged.
+    registry* owner() const;
 
     /* components management */
     template < typename T, typename... Ts >

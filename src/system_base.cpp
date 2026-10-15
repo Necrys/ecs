@@ -7,7 +7,7 @@ system_base::system_base():
   m_enabled( true ) {
 }
 
-bool system_base::updated() {
+bool system_base::updated() const {
   return m_updated;
 }
 
@@ -31,7 +31,7 @@ void system_base::clear_dependencies() {
   m_dependencies.clear();
 }
 
-void system_base::add_dependency( std::shared_ptr< system_base > dep ) {
+void system_base::add_dependency( const std::shared_ptr< system_base >& dep ) {
   m_dependencies.push_back( dep );
 }
 
