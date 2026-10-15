@@ -7,8 +7,11 @@
 #     -fcoverage-mapping, reported by llvm-cov, which ships with LLVM. clang-cl
 #     accepts the switches as they are, and the profile counts regions, functions,
 #     lines and branches.
-#   * GCC - --coverage (gcov), which is what the boards have. It is wired here but
-#     has not been exercised from this machine; the report side is tools/coverage.py.
+#   * GCC - --coverage (gcov), which is what the boards have. Checked on the Pi 1:
+#     the switches are accepted, the library and the header check build, and every
+#     translation unit gets a .gcno beside its object. The report side is missing,
+#     though: tools/coverage.py drives clang and llvm-cov only, so nothing consumes
+#     the gcov data, and gcovr/lcov are not installed on the boards.
 #   * MSVC - refused. Its only supported path is Microsoft.CodeCoverage, whose
 #     CodeCoverage.exe belongs to the Enterprise test tooling and is not installed
 #     with Community; accepting the option would produce a report of nothing.
