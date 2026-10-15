@@ -12,7 +12,8 @@
       "binaryDir": "${sourceDir}/build/${presetName}",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "ECS_BUILD_BENCHMARKS": "ON"
+        "ECS_BUILD_BENCHMARKS": "ON",
+        "ECS_BUILD_TESTS": "OFF"
       }
     },
 
