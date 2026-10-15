@@ -240,6 +240,8 @@ def main() -> int:
     parser.add_argument("--uncovered", action="store_true", help="list lines no test reaches")
     parser.add_argument("--html", metavar="DIR", help="also write an HTML report there")
     parser.add_argument("--lcov", metavar="FILE", help="where to write the merged lcov tracefile")
+    parser.add_argument("--junit", metavar="FILE",
+                        help="where ctest writes its JUnit report (default: inside the build directory)")
     parser.add_argument("--summary", metavar="FILE",
                         help="also write the numbers as a markdown block, for a CI run summary")
     parser.add_argument("--no-threshold", action="store_true", help="report without checking the floor")
@@ -249,6 +251,10 @@ def main() -> int:
     global PRESET, BUILD_DIR
     PRESET = args.preset
     BUILD_DIR = REPO_ROOT / "build" / PRESET
+
+    # Named by the caller when it wants a particular place - the CI does, because it
+    # publishes the file - and otherwise next to the build tree.
+    junit_path = Path(args.junit) if args.junit else BUILD_DIR / "junit.xml"
 
     llvm_cov = find_llvm_tool("llvm-cov.exe" if os.name == "nt" else "llvm-cov")
     llvm_profdata = find_llvm_tool("llvm-profdata.exe" if os.name == "nt" else "llvm-profdata")
@@ -295,7 +301,12 @@ def main() -> int:
                 str(BUILD_DIR),
                 "--output-on-failure",
                 "--output-junit",
-                str(BUILD_DIR / "junit.xml"),
+                # Resolved, because ctest reads a relative --output-junit against
+                # --test-dir rather than against the working directory: a bare
+                # `build/junit.xml` would land inside the build directory as
+                # `build/<preset>/build/junit.xml`, which is exactly how the CI
+                # reports came to read zero tests for two platforms.
+                str(junit_path.resolve()),
             ],
             cwd=REPO_ROOT,
             env=environment,

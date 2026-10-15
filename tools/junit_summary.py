@@ -10,10 +10,14 @@ Usage:
 
     python3 tools/junit_summary.py --title "Tests" build/release/junit.xml
 
-The exit code is 0 even when a file is missing or empty: the tests themselves
-decide whether a job fails, and a summary that fails the job it describes only
-hides the real verdict. A file that could not be read is reported as such instead
-of being left out.
+The exit code is 0 even when a file is missing or empty, unless --strict is given:
+the tests themselves decide whether a job fails, and a summary that fails the job it
+describes only hides the real verdict. A file that could not be read is reported as
+such instead of being left out.
+
+--strict is for the caller that knows the file has to be there - a CI job that just
+wrote it, say. A report that silently reads zero tests is worse than a failed step:
+the numbers look like a passing suite that ran nothing.
 """
 
 from __future__ import annotations
@@ -96,10 +100,16 @@ def render(title: str, reports: list[tuple[str, Totals]]) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Summarise CTest JUnit reports as markdown.")
     parser.add_argument("--title", default="Tests", help="heading for the block")
+    parser.add_argument(
+        "--strict",
+        action="store_true",
+        help="exit non-zero when a report is missing or unreadable, not only report it",
+    )
     parser.add_argument("reports", nargs="+", metavar="JUNIT", help="JUnit XML files to read")
     args = parser.parse_args()
 
     reports: list[tuple[str, Totals]] = []
+    incomplete = 0
     for name in args.reports:
         path = Path(name)
         if path.is_file():
@@ -108,10 +118,18 @@ def main() -> int:
                 continue
             except ElementTree.ParseError as error:
                 reports.append((f"{relative(path)} (unreadable: {error})", Totals()))
+                incomplete += 1
                 continue
         reports.append((f"{relative(path)} (missing)", Totals()))
+        incomplete += 1
 
     sys.stdout.write(render(args.title, reports))
+    if incomplete and args.strict:
+        print(
+            f"error: {incomplete} of {len(args.reports)} reports were missing or unreadable",
+            file=sys.stderr,
+        )
+        return 3
     return 0
 
 

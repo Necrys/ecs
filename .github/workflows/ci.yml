@@ -78,11 +78,20 @@ jobs:
       # the entity id space - the merged lcov, the HTML report and the floor check.
       # This is the same command a developer runs before a commit, so the gate here
       # and the gate at home cannot drift apart.
+      #
+      # Every report path is named here rather than left to the tools' defaults: a
+      # default follows the preset, and the preset's build directory is not the same
+      # on both platforms (`build/coverage` here is clang-cl's, `build/linux-coverage`
+      # is this job's). Naming them keeps the paths the job writes to, reads from and
+      # uploads identical, which is the only reason the three can be checked against
+      # each other.
       - name: Coverage
         run: |
           python3 tools/coverage.py \
             --preset linux-coverage \
+            --lcov build/coverage/merged.lcov \
             --html build/coverage/html \
+            --junit "${{ github.workspace }}/junit-coverage.xml" \
             --uncovered \
             --summary summary-linux-clang.md
 
@@ -98,11 +107,17 @@ jobs:
       # Release is not a repeat of the Debug run above: the optimiser inlines
       # differently, the standard library's own checks are gone, and -Werror sees
       # different code. This is also the configuration the benchmarks measure.
+      #
+      # The JUnit path is absolute because ctest resolves --output-junit relative to
+      # --test-dir, not to the working directory: a bare `junit-release.xml` lands in
+      # build/release/, where nothing looks for it. That is why these reports used to
+      # be read as zero tests.
       - name: Build and test (Release)
         run: |
           cmake --preset linux-clang -B build/release -DCMAKE_BUILD_TYPE=Release
           cmake --build build/release --parallel
-          ctest --test-dir build/release --output-on-failure --output-junit junit-release.xml
+          ctest --test-dir build/release --output-on-failure \
+            --output-junit "${{ github.workspace }}/junit-release.xml"
 
       - name: clang-tidy
         run: python3 tools/check.py --no-format --no-build --no-tests --tidy
@@ -110,8 +125,8 @@ jobs:
       - name: Summary
         if: always()
         run: |
-          python3 tools/junit_summary.py --title "Tests (clang 22)" \
-            build/coverage/junit.xml junit-release.xml >> summary-linux-clang.md
+          python3 tools/junit_summary.py --strict --title "Tests (clang 22)" \
+            junit-coverage.xml junit-release.xml >> summary-linux-clang.md
           cat summary-linux-clang.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload the summary fragment
@@ -129,8 +144,11 @@ jobs:
           path: |
             build/coverage/merged.lcov
             build/coverage/html
-            build/coverage/junit.xml
+            junit-coverage.xml
             junit-release.xml
+          # A report that was not there is the defect this upload would otherwise
+          # hide: the artifact simply would not exist, and nobody would look.
+          if-no-files-found: error
 
   linux-gcc:
     name: Linux, GCC 14
@@ -152,7 +170,8 @@ jobs:
           cmake --preset linux-gcc -B build/gcc-debug \
             -DCMAKE_C_COMPILER=gcc-14 -DCMAKE_CXX_COMPILER=g++-14
           cmake --build build/gcc-debug --parallel
-          ctest --test-dir build/gcc-debug --output-on-failure --output-junit junit-gcc-debug.xml
+          ctest --test-dir build/gcc-debug --output-on-failure \
+            --output-junit "${{ github.workspace }}/junit-gcc-debug.xml"
 
       - name: Assert the compiler is GCC 14
         run: |
@@ -169,12 +188,13 @@ jobs:
             -DCMAKE_C_COMPILER=gcc-14 -DCMAKE_CXX_COMPILER=g++-14 \
             -DECS_ENABLE_ASAN=ON -DECS_ENABLE_UBSAN=ON
           cmake --build build/gcc-asan --parallel
-          ctest --test-dir build/gcc-asan --output-on-failure --output-junit junit-gcc-asan.xml
+          ctest --test-dir build/gcc-asan --output-on-failure \
+            --output-junit "${{ github.workspace }}/junit-gcc-asan.xml"
 
       - name: Summary
         if: always()
         run: |
-          python3 tools/junit_summary.py --title "Tests (GCC 14)" \
+          python3 tools/junit_summary.py --strict --title "Tests (GCC 14)" \
             junit-gcc-debug.xml junit-gcc-asan.xml >> summary-linux-gcc.md
           cat summary-linux-gcc.md >> "$GITHUB_STEP_SUMMARY"
 
@@ -193,6 +213,7 @@ jobs:
           path: |
             junit-gcc-debug.xml
             junit-gcc-asan.xml
+          if-no-files-found: error
 
   windows-msvc:
     name: Windows, MSVC
@@ -227,7 +248,7 @@ jobs:
         if: always()
         shell: bash
         run: |
-          python tools/junit_summary.py --title "Tests (MSVC)" \
+          python tools/junit_summary.py --strict --title "Tests (MSVC)" \
             build/tests-only/junit.xml build/msvc-asan/junit.xml > summary-windows-msvc.md
           cat summary-windows-msvc.md >> "$GITHUB_STEP_SUMMARY"
 
@@ -246,6 +267,9 @@ jobs:
           path: |
             build/tests-only/junit.xml
             build/msvc-asan/junit.xml
+          # See reports-linux-clang: a missing report is what this upload is here to
+          # make visible, not to swallow.
+          if-no-files-found: error
 
   summary:
     name: Summary
