@@ -3,6 +3,11 @@ project ( ecs LANGUAGES CXX )
 
 option( ECS_BUILD_TESTS "Build tests" ON )
 
+# Benchmarks are off by default: they are run deliberately, locally, and their
+# results are compared against a recorded baseline rather than checked on every
+# build.
+option( ECS_BUILD_BENCHMARKS "Build benchmarks" OFF )
+
 # C++17 rather than C++11: the test framework (Catch2 v3) requires at least
 # C++14, so the standard has to move anyway, and going straight to 17 avoids a
 # second migration. Nothing in the library relied on C++11 specifically.
@@ -29,4 +34,8 @@ enable_testing()
 
 if ( ECS_BUILD_TESTS )
   add_subdirectory( tests )
+endif()
+
+if ( ECS_BUILD_BENCHMARKS )
+  add_subdirectory( bench )
 endif()

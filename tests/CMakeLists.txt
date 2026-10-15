@@ -62,7 +62,11 @@ foreach ( target ${tests} )
     )
     target_compile_definitions ( ${target}
       PRIVATE
-        _HAS_ITERATOR_DEBUGGING=1
+        # Iterator debugging is a Debug-only facility of the MSVC standard
+        # library; forcing it in a Release build is a hard error there. The
+        # library keeps assert() enabled on its own, so the tests still exercise
+        # the internal checks that matter.
+        $<$<CONFIG:Debug>:_HAS_ITERATOR_DEBUGGING=1>
     )
   elseif ( CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang" )
     target_compile_options ( ${target}

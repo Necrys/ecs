@@ -1,0 +1,87 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 21,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "ECS_BUILD_BENCHMARKS": "ON"
+      }
+    },
+
+    {
+      "name": "msvc",
+      "displayName": "MSVC (Release)",
+      "description": "Default toolchain on Windows. Benchmarks build with /O2 pinned in bench/CMakeLists.txt.",
+      "inherits": "base",
+      "generator": "Ninja"
+    },
+    {
+      "name": "clang-cl",
+      "displayName": "Clang in MSVC mode (Release)",
+      "description": "Separate compiler, same ABI as MSVC. Used to compare code generation between the two.",
+      "inherits": "base",
+      "generator": "Ninja",
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "clang-cl",
+        "CMAKE_CXX_COMPILER": "clang-cl"
+      }
+    },
+    {
+      "name": "clang",
+      "displayName": "Clang in GNU mode (Release)",
+      "description": "LLVM clang driver. Needs the llvm-mingw or a GNU-like environment on Windows.",
+      "inherits": "base",
+      "generator": "Ninja",
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "clang",
+        "CMAKE_CXX_COMPILER": "clang++"
+      }
+    },
+    {
+      "name": "gcc",
+      "displayName": "GCC (Release)",
+      "description": "GCC, used on Linux and on the Raspberry Pi boards.",
+      "inherits": "base",
+      "generator": "Unix Makefiles",
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "gcc",
+        "CMAKE_CXX_COMPILER": "g++"
+      }
+    },
+    {
+      "name": "gcc-pi",
+      "displayName": "GCC on Raspberry Pi (Release)",
+      "description": "Same as gcc, kept separate so that Pi runs are recorded under their own preset name. Expect a much smaller workload: the benchmark sizes itself from RAM and cache.",
+      "inherits": "gcc"
+    },
+    {
+      "name": "tests-only",
+      "displayName": "Tests only (no benchmarks)",
+      "description": "The configuration used for ordinary development and for the test suite.",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "ECS_BUILD_TESTS": "ON",
+        "ECS_BUILD_BENCHMARKS": "OFF"
+      }
+    }
+  ],
+
+  "buildPresets": [
+    { "name": "msvc", "configurePreset": "msvc" },
+    { "name": "clang-cl", "configurePreset": "clang-cl" },
+    { "name": "clang", "configurePreset": "clang" },
+    { "name": "gcc", "configurePreset": "gcc" },
+    { "name": "gcc-pi", "configurePreset": "gcc-pi" },
+    { "name": "tests-only", "configurePreset": "tests-only" }
+  ]
+}

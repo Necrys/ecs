@@ -139,7 +139,8 @@ The broad picture:
 - the library itself (component storage, registry, systems, events) exists but
   needs to be brought to a working state;
 - tests build and run, but cover only part of the library;
-- there are no benchmarks at all;
+- benchmarks exist and are used to keep performance honest, but they are run by
+  hand rather than in CI, and there is no recorded baseline in the repository;
 - multithreading, resources and deferred operations are not implemented;
 - there is no user-facing documentation beyond `README.md`.
 
@@ -169,6 +170,7 @@ ecs/
 |   `-- type_enumerator.h      assigns ids to component/system/event types
 |-- src/                   non-template .cpp implementations
 |-- tests/                 unit tests (Catch2)
+|-- bench/                 benchmarks (off by default, see bench/README.md)
 `-- tools/                 helper scripts (formatting)
 ```
 
@@ -208,6 +210,20 @@ With MSVC it is convenient to call `vcvars64.bat` once, otherwise `cmake` will
 not find the compiler. The test binaries can also be run directly; they take the
 usual Catch2 command line (`sparse_vector.exe --list-tests`, `-s` for verbose
 output, and so on).
+
+Benchmarks are a separate build, off by default and deliberately not registered
+with CTest, with one preset per compiler (`msvc`, `clang-cl`, `clang`, `gcc`):
+
+```bash
+cmake --preset msvc
+cmake --build --preset msvc
+build/msvc/bench/bench_iter.exe --csv <path outside the repository>
+```
+
+They size their workload from the machine they run on and report a median with a
+spread, so they are usable on a desktop and on a Raspberry Pi alike. See
+`bench/README.md` before running or changing them, and measure before and after
+any change to `join`, `sparse_vector` or `get_*`.
 
 ---
 
@@ -278,4 +294,5 @@ rationale live separately from the code and do not go into the repository.
 | How to lay out code | `CODE_STYLE.md` |
 | What is built and how | `CMakeLists.txt`, `README.md` |
 | How to format | `tools/format.ps1` (Windows), `tools/format.py` (anywhere), `.clang-format` |
+| How to benchmark, and how to read a result | `bench/README.md` |
 | API entry points | `include/registry.h`, `include/entity.h`, `include/storage.h` |

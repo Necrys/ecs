@@ -96,11 +96,16 @@ rules for working with the code.
 |---|---|
 | `AGENTS.md` | project map and working rules, including for agents |
 | `CODE_STYLE.md` | code style and commenting requirements |
+| `bench/README.md` | how to build, run and read the benchmarks |
 | `README.md` | this file - an introduction to the project |
 | `LICENSE` | license |
 
 Generated-from-source documentation will appear only if there is a real need for
 it; plans, history and design rationale do not belong in the repository.
+
+Performance is the first priority here, so the repository ships a small benchmark
+suite. It is off by default, sizes its workload from the machine it runs on, and
+deliberately keeps its results out of the repository - see `bench/README.md`.
 
 ---
 
