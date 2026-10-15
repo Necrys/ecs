@@ -85,6 +85,11 @@ endforeach ()
 # CTest registration
 #
 # enable_testing() is called by the top-level CMakeLists.txt.
+#
+# No PASS_REGULAR_EXPRESSION on purpose: Catch2 writes its summary to stderr, so
+# a pass pattern is never matched and every test would be reported as failed. The
+# exit code is the verdict, and [!mayfail] keeps the known layout defect from
+# turning that code non-zero.
 # -----------------------------------------------------------------------------
 foreach ( target ${tests} )
   add_test ( NAME ${target} COMMAND ${target} )

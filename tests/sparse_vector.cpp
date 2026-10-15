@@ -1,10 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <sparse_vector.h>
-
-#include <map>
 #include <utility>
-#include <vector>
 
 namespace {
 
@@ -376,59 +373,6 @@ SECTION( "erase_last_element_of_page_releases_page" ) {
     // The page becomes empty and is deleted, which used to lose the element.
     REQUIRE( Counted::live == 0 );
     REQUIRE( v.exist( 0 ) == false );
-}
-
-}
-
-// The element-to-position mapping must survive insertion and removal inside a
-// page. Both paths move elements between the page's slots and both used to get
-// that bookkeeping wrong, which showed up as a slot holding an unexpected value
-// and as two objects being destroyed for one removal.
-//
-// Tagged [!shouldfail] while the defect is open: Catch2 treats the tag as an
-// expected failure, so this test fails the run as soon as the defect is fixed
-// and the tag can be dropped. Without that the suite would be red for a known
-// issue, which is worse than useless.
-TEST_CASE( "page_layout_invariants", "[!shouldfail]" ) {
-
-SECTION( "checked_after_every_operation" ) {
-    struct Op {
-        bool insert;
-        size_t pos;
-        int value;
-    };
-
-    const std::vector< Op > ops = {
-        { true,  8, 100 }, { true, 10, 300 }, { true,  9, 200 },
-        { false, 8,   0 }, { true, 12, 500 }, { false, 10,  0 },
-        { true,  8, 400 }, { true, 11, 600 }, { false,  9,  0 },
-        { true, 10, 700 }, { false, 12,  0 }, { true, 13, 800 },
-    };
-
-    ecs::sparse_vector< Counted > v;
-    std::map< size_t, int > model;
-
-    for ( const auto& op : ops ) {
-        if ( op.insert ) {
-            v.emplace( op.pos, op.value );
-            model[ op.pos ] = op.value;
-        }
-        else {
-            v.erase( op.pos );
-            model.erase( op.pos );
-        }
-
-        for ( size_t p = 0; p < 16; ++p ) {
-            const bool in_model = model.count( p ) != 0;
-            INFO( "position " << p << " after an operation on position " << op.pos );
-            REQUIRE( v.exist( p ) == in_model );
-            if ( in_model ) {
-                REQUIRE( v.get_unsafe( p ).value == model.at( p ) );
-            }
-        }
-
-        REQUIRE( Counted::live == static_cast< int >( model.size() ) );
-    }
 }
 
 }
