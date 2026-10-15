@@ -197,12 +197,13 @@ SECTION( "system_after_the_end_is_inactive" ) {
   // Any id at or beyond the vector size used to be read out of bounds:
   // sid == size() took the branch and dereferenced m_systems[size()].
   //
-  // CountingSystem is the highest system type id in this binary, so its id plus
-  // one is exactly size() here, and anything beyond it is safely outside.
-  const auto past_the_end = ecs::type_collection< ecs::systems >::type_id< CountingSystem >() + 1;
+  // The size is asked for rather than derived from a type id: system slots are
+  // allocated up to the highest type id in use, and which type has the highest
+  // id depends on the order the tests happen to run in.
+  const size_t size = r.system_count();
 
-  REQUIRE( r.is_system_active( past_the_end ) == false );
-  REQUIRE( r.is_system_active( past_the_end + 5 ) == false );
+  REQUIRE( r.is_system_active( size ) == false );
+  REQUIRE( r.is_system_active( size + 5 ) == false );
 }
 
 }

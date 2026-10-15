@@ -114,4 +114,8 @@ bool registry::is_system_active( const size_t sid ) const {
   return s && s->enabled();
 }
 
+size_t registry::system_count() const {
+  return m_systems.size();
+}
+
 }
