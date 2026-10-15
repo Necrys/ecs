@@ -379,12 +379,10 @@ TEST_CASE( "entity_handles", "[unit]" ) {
 // only advances a counter. Nothing may be remembered per entity here, though: a
 // vector of the handles would be 8 bytes each, which is 34 GB for the full space.
 //
-// The tag keeps it out of the default CTest set (tests/CMakeLists.txt asks the
-// discovery step to skip [slow]), because a suite that runs in a fraction of a
-// second should not grow a minute-long case by default. Run it deliberately:
-//
-//   build/tests-only/tests/registry.exe "[slow]"
-//   python tools/coverage.py --slow
+// The case runs in the ordinary set, tagged [slow] so that it can be left out when
+// the minute matters - `ctest -LE slow` is the tight loop, and it is the only way
+// to skip it. Being in the ordinary set is what keeps library line coverage at
+// 100%: a flag that hides the throw would also hide the fact that nothing tests it.
 TEST_CASE( "entity_id_space_exhaustion", "[unit][slow]" ) {
   ecs::registry r;
 

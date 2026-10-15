@@ -106,10 +106,9 @@ endforeach ()
 include( Catch )
 
 foreach ( target ${tests} )
+  # Everything except the [slow] cases, which get their own registration below so
+  # that they can carry a timeout of their own.
   catch_discover_tests( ${target}
-    # [slow] cases are left out of the default set: exhausting the entity id space
-    # takes about a minute, and the rest of the suite takes a fraction of one. Run
-    # them deliberately - the case says how.
     TEST_SPEC "~[slow]"
     # Names are prefixed with the binary: "init" exists in more than one file.
     TEST_PREFIX ${target}.
@@ -117,8 +116,23 @@ foreach ( target ${tests} )
     # purpose possible: `ctest -L unit`, `ctest -L regression`, `ctest -L d1`.
     ADD_TAGS_AS_LABELS
     PROPERTIES
-      # A case that hangs must not hang the run; the suite takes milliseconds
-      # today, so the limit is generous rather than tight.
+      # A case that hangs must not hang the run; the rest of the suite takes
+      # milliseconds, so this limit is a hang detector, not a budget.
       TIMEOUT 60
+  )
+
+  # [slow] cases are part of the ordinary run - exhausting the entity id space
+  # takes about 15 s in Release and 65 s in MSVC Debug, which is a real cost but
+  # not a reason to leave the throw in allocate() unexercised. They need their own
+  # timeout because the 60 s above would kill the Debug run, and they keep the
+  # [slow] label, so `ctest -LE slow` is the tight loop when the minute matters.
+  catch_discover_tests( ${target}
+    TEST_SPEC "[slow]"
+    TEST_PREFIX ${target}.
+    ADD_TAGS_AS_LABELS
+    PROPERTIES
+      # The boards are the slowest place this runs: a Debug build on a Pi 1 would
+      # take minutes, and the limit is here to catch a hang, not to hurry anyone.
+      TIMEOUT 900
   )
 endforeach ()
