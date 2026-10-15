@@ -37,10 +37,14 @@ public:
   registry& operator=( const registry& ) = delete;
   registry& operator=( registry&& ) = delete;
 
+  // Declared because the four above are: the class says how it dies as well as how
+  // it refuses to be copied.
+  ~registry() = default;
+
   /* entity management */
   entity allocate();
   void deallocate( const entity& e );
-  void deallocate( const eid_t id );
+  void deallocate( eid_t id );
 
   components_storage& components();
 
@@ -56,20 +60,20 @@ public:
 
   void update();
 
-  bool is_system_active( const size_t sid ) const;
+  [[nodiscard]] bool is_system_active( size_t sid ) const;
 
 private:
   template < typename S, typename E >
   void register_system( system_wrapper< S >& system );
 
   template < typename S, typename E, typename... Rs >
-  typename std::enable_if< ( sizeof...( Rs ) > 0 ) >::type register_system( system_wrapper< S >& system );
+  std::enable_if_t< ( sizeof...( Rs ) > 0 ) > register_system( system_wrapper< S >& system );
 
   template < typename T >
-  void add_system_dependencies( const size_t sys_id );
+  void add_system_dependencies( size_t sid );
 
   template < typename T, typename... Rs >
-  typename std::enable_if< ( sizeof...( Rs ) > 0 ) >::type add_system_dependencies( const size_t sys_id );
+  std::enable_if_t< ( sizeof...( Rs ) > 0 ) > add_system_dependencies( size_t sid );
 
   bool rebuild_system_dependency_tree();
 
@@ -82,12 +86,12 @@ private:
   std::unordered_set< eid_t > m_freeEntityIds;
   std::deque< eid_t > m_freeEntityIdQueue;
   components_storage m_components;
-  eid_t m_entityIdCounter;
+  eid_t m_entityIdCounter{ 0 };
 
   /* systems */
   std::vector< std::shared_ptr< system_base > > m_systems;
   std::vector< std::set< size_t > > m_systemDependenciesMatrix;
-  bool m_rebuildDependencyTree;
+  bool m_rebuildDependencyTree{ false };
 
   std::vector< std::unique_ptr< event_handler_base > > m_handlers;
 };

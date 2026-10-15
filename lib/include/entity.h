@@ -11,7 +11,7 @@ class entity {
 public:
   static const eid_t bad_id = std::numeric_limits< eid_t >::max();
 
-  entity( const eid_t id, registry* owner );
+  entity( eid_t id, registry* owner );
   entity( const entity& e );
 
   // Copying a handle is cheap and must stay available; moving one cannot throw
@@ -21,11 +21,16 @@ public:
   entity& operator=( const entity& e );
   entity& operator=( entity&& e ) noexcept;
 
-  eid_t id() const;
+  // Declared rather than left implicit, because the other four are: a type that
+  // says how it is copied and moved should also say how it dies, even when the
+  // answer is "the same way as always".
+  ~entity() = default;
+
+  [[nodiscard]] eid_t id() const;
 
   // The registry the handle came from. Const on the handle, not on the
   // registry: the handle does not own it and may hand it out unchanged.
-  registry* owner() const;
+  [[nodiscard]] registry* owner() const;
 
   /* components management */
   template < typename T, typename... Ts >
@@ -43,7 +48,6 @@ public:
   template < typename T >
   void remove();
 
-public:
   registry* m_owner;
   eid_t m_id;
 };

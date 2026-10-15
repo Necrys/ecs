@@ -24,12 +24,20 @@ public:
   // translation unit.
   virtual ~system_base();
 
-  bool updated() const;
+  // The rest of the set, declared for the same reason as in the other bases: the
+  // class says how it is copied and moved as well as how it dies. Systems are held
+  // by shared_ptr, so this is about being able to say it, not about being copied.
+  system_base( const system_base& ) = default;
+  system_base( system_base&& ) = default;
+  system_base& operator=( const system_base& ) = default;
+  system_base& operator=( system_base&& ) = default;
+
+  [[nodiscard]] bool updated() const;
 
   virtual void update() = 0;
   void reset_update();
 
-  bool enabled() const;
+  [[nodiscard]] bool enabled() const;
 
   void enable();
   void disable();
@@ -40,11 +48,11 @@ public:
   // shared_ptr by value would bump the count on every registration.
   void add_dependency( const std::shared_ptr< system_base >& dep );
 
-  bool ready() const;
+  [[nodiscard]] bool ready() const;
 
 protected:
-  bool m_updated;
-  bool m_enabled;
+  bool m_updated{ false };
+  bool m_enabled{ true };
 
   std::vector< std::shared_ptr< system_base > > m_dependencies;
 };

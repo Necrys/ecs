@@ -36,7 +36,7 @@ void registry::register_system( system_wrapper< S >& system ) {
 }
 
 template < typename S, typename E, typename... Rs >
-typename std::enable_if< ( sizeof...( Rs ) > 0 ) >::type registry::register_system( system_wrapper< S >& system ) {
+std::enable_if_t< ( sizeof...( Rs ) > 0 ) > registry::register_system( system_wrapper< S >& system ) {
   const auto sid = type_collection< systems >::type_id< S >();
   auto& h = get_or_create_handler< E >();
   h.subscribe( [ &system ]( const E& e ) { system.get().handle_event( e ); }, sid );
@@ -52,7 +52,7 @@ void registry::add_system_dependencies( const size_t sid ) {
 }
 
 template < typename S, typename... Rs >
-typename std::enable_if< ( sizeof...( Rs ) > 0 ) >::type registry::add_system_dependencies( const size_t sid ) {
+std::enable_if_t< ( sizeof...( Rs ) > 0 ) > registry::add_system_dependencies( const size_t sid ) {
   const auto dep_sid = type_collection< systems >::type_id< S >();
   m_systemDependenciesMatrix[ sid ].emplace( dep_sid );
   add_system_dependencies< Rs... >( sid );

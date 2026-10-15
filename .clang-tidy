@@ -19,12 +19,29 @@
 #                                         - the page indexes its arrays by slot by design
 #   readability-named-parameter           - an unnamed parameter is how the code says
 #                                           "unused"; naming it would trip -Wunused-parameter
+#   cppcoreguidelines-pro-bounds-avoid-unchecked-container-access
+#                                         - the containers index storage whose bounds they
+#                                           have already established; the checked form would
+#                                           be a cost on the hot path (see D15)
+#   cppcoreguidelines-pro-type-reinterpret-cast
+#   cppcoreguidelines-pro-bounds-array-to-pointer-decay
+#   cppcoreguidelines-pro-bounds-pointer-arithmetic
+#                                         - the page is raw bytes carved into slots, which is
+#                                           the same design the disabled
+#                                           -Wno-unsafe-buffer-usage already accepts (D15)
+#   cppcoreguidelines-avoid-const-or-ref-data-members
+#                                         - a handle or a view refers to what it views: entity
+#                                           holds its registry, a storage holds its component
+#                                           storage, a selection holds what it walks
+#   cppcoreguidelines-non-private-member-variables-in-classes
+#                                         - system_base's state belongs to the systems derived
+#                                           from it, not to its users
 #
 # Findings are a gate. The first run produced 46, all of them dealt with (fixed or
-# disabled above with a reason), and the report has been empty since the tests were
-# split into per-behaviour cases. Anything new is therefore either a real defect or
-# a check that does not fit the design - and the second case belongs in the list
-# above with its reason, not in a list of accepted findings.
+# disabled above with a reason). The second round found that the header filter below
+# never matched on Windows, so the checks had only ever seen .cpp files: once the
+# filter worked, twenty-eight checks reported in the public headers - some fixed,
+# some disabled above, and none of them accepted as a standing report.
 ---
 Checks: >-
   bugprone-*,
@@ -42,11 +59,21 @@ Checks: >-
   -cppcoreguidelines-avoid-c-arrays,
   -modernize-avoid-c-arrays,
   -cppcoreguidelines-pro-bounds-constant-array-index,
-  -readability-named-parameter
+  -readability-named-parameter,
+  -cppcoreguidelines-pro-bounds-avoid-unchecked-container-access,
+  -cppcoreguidelines-pro-type-reinterpret-cast,
+  -cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+  -cppcoreguidelines-pro-bounds-pointer-arithmetic,
+  -cppcoreguidelines-avoid-const-or-ref-data-members,
+  -cppcoreguidelines-non-private-member-variables-in-classes
 
 WarningsAsErrors: '*'
 
-HeaderFilterRegex: '(lib/include|lib/src|tests)/.*'
+# Paths arrive with the platform's separators: backslashes on Windows, slashes
+# elsewhere. A regex written for one of them silently turned the header filter off on
+# the other, which is how the whole backlog of findings inside lib/include stayed
+# invisible until a Linux run reported 2578 of them.
+HeaderFilterRegex: '(lib[\\/]include|lib[\\/]src|tests)[\\/].*'
 
 FormatStyle: file
 

@@ -31,33 +31,42 @@ class components_storage {
     explicit join_exclude_wrapper( components_storage& storage );
 
     template < typename... TsEx, typename Ft >
-    void exclude( Ft&& func );
+    void exclude( Ft func );
 
   private:
     components_storage& m_storage;
   };
 
 public:
+  components_storage() = default;
   ~components_storage();
+
+  // Owns the component storages behind the pointers it hands out, so a copy would
+  // be two owners of them. Deleted explicitly: the destructor is declared, and the
+  // class should say what that means for copying rather than leave it implicit.
+  components_storage( const components_storage& ) = delete;
+  components_storage( components_storage&& ) = delete;
+  components_storage& operator=( const components_storage& ) = delete;
+  components_storage& operator=( components_storage&& ) = delete;
 
   /* modify */
   template < typename T, typename... Ts >
-  T& add_entity_component( const eid_t id, Ts&&... ts );
+  T& add_entity_component( eid_t id, Ts&&... ts );
 
   template < typename T, typename... Ts >
-  T& set_entity_component( const eid_t id, const T& t );
+  T& set_entity_component( eid_t id, const T& t );
 
   template < typename T >
-  void remove_entity_component( const eid_t id );
+  void remove_entity_component( eid_t id );
 
-  void remove_all_components( const eid_t id );
+  void remove_all_components( eid_t id );
 
   /* access */
   template < typename T >
-  T* get_entity_component( const eid_t id );
+  T* get_entity_component( eid_t id );
 
   template < typename T >
-  const T* get_entity_component( const eid_t id ) const;
+  const T* get_entity_component( eid_t id ) const;
 
   // The typed view of one component's storage, or null when the type has never
   // been used. Public because a selection has to reach it from outside the
@@ -68,7 +77,7 @@ public:
 
   /* selection */
   template < typename... Cs, typename Ft >
-  void join( Ft&& func );
+  void join( Ft func );
 
   template < typename... Ts >
   join_exclude_wrapper< Ts... > join();
@@ -79,7 +88,7 @@ private:
 
   // True when every listed component is present on the id.
   template < class... Cs >
-  bool exists_all( const eid_t id ) const;
+  [[nodiscard]] bool exists_all( eid_t id ) const;
 
   std::vector< sparse_vector_base* > m_componentStorages;
 };

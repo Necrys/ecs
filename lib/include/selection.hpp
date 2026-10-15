@@ -17,8 +17,7 @@
 #include <initializer_list>
 #include <utility>
 
-namespace ecs {
-namespace detail {
+namespace ecs::detail {
 
 // A pack carried as a value. A bare parameter pack cannot be followed by a
 // deduced template parameter, so wherever the component set has to travel
@@ -94,7 +93,7 @@ void set_slot( Storage& storage, const eid_t id, Pack& pack ) {
 // argument, and every component would read the same slot.
 template < typename Storage, typename Walked, typename... Cs, size_t... Is >
 component_pack< sizeof...( Cs ) > resolve_pack_impl( Storage& storage, const eid_t id, std::index_sequence< Is... > ) {
-  component_pack< sizeof...( Cs ) > pack;
+  component_pack< sizeof...( Cs ) > pack{};
   ( void )std::initializer_list< int >{ ( set_slot< Storage, Walked, Cs, Is >( storage, id, pack ), 0 )... };
   return pack;
 }
@@ -111,15 +110,15 @@ struct selection_visitor {
 
   template < typename Ft, typename Walked >
   bool
-  visit( Ft&& callback, const eid_t id, const Walked& walked, const component_pack< sizeof...( Cs ) >& pack ) const {
-    invoke( std::forward< Ft >( callback ), id, walked, pack, std::make_index_sequence< sizeof...( Cs ) >() );
+  visit( Ft& callback, const eid_t id, const Walked& walked, const component_pack< sizeof...( Cs ) >& pack ) const {
+    invoke( callback, id, walked, pack, std::make_index_sequence< sizeof...( Cs ) >() );
     return true;
   }
 
 private:
   template < typename Ft, typename Walked, size_t... Is >
   void invoke(
-    Ft&& callback,
+    Ft& callback,
     const eid_t id,
     const Walked& walked,
     const component_pack< sizeof...( Cs ) >& pack,
@@ -131,7 +130,8 @@ private:
   // The slot filled with null is the one the walked element belongs to; every
   // other slot holds a resolved pointer.
   template < typename C, size_t Slot, typename Walked >
-  const C& element( const Walked& walked, const component_pack< sizeof...( Cs ) >& pack ) const {
+  [[nodiscard]] [[nodiscard]] [[nodiscard]] [[nodiscard]] const C&
+  element( const Walked& walked, const component_pack< sizeof...( Cs ) >& pack ) const {
     const void* pointer = pack.pointers[ Slot ];
     if ( pointer == nullptr ) {
       return reinterpret_cast< const C& >( walked );
@@ -148,7 +148,7 @@ private:
 // comparison below matches; the other branches only run while `found` is still
 // false.
 template < typename Storage, typename... Cs, typename Ft >
-bool walk_required( Storage& storage, Ft&& callback ) {
+bool walk_required( Storage& storage, Ft callback ) {
   const auto picked = smallest_storage< Storage, Cs... >( storage );
   if ( picked.first == nullptr ) {
     return false;
@@ -180,5 +180,4 @@ bool walk_required( Storage& storage, Ft&& callback ) {
   return found;
 }
 
-} // namespace detail
-} // namespace ecs
+} // namespace ecs::detail

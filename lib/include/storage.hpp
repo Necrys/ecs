@@ -1,5 +1,7 @@
 #pragma once
 
+#include <utility>
+
 #include "selection.hpp"
 
 namespace ecs {
@@ -31,9 +33,9 @@ sparse_vector< T >* components_storage::get_storage() const {
 }
 
 template < typename T, typename... Ts >
-T& components_storage::add_entity_component( const eid_t id, Ts&&... args ) {
+T& components_storage::add_entity_component( eid_t id, Ts&&... ts ) {
   auto& storage = get_or_create_storage< T >();
-  return storage.emplace( id, args... );
+  return storage.emplace( id, std::forward< Ts >( ts )... );
 }
 
 template < typename T >
@@ -47,7 +49,7 @@ T* components_storage::get_entity_component( const eid_t id ) {
 }
 
 template < typename T >
-const T* components_storage::get_entity_component( const eid_t id ) const {
+[[nodiscard]] const T* components_storage::get_entity_component( const eid_t id ) const {
   const auto storage = get_storage< T >();
   if ( storage && storage->exist( id ) ) {
     return &storage->get_unsafe( id );
@@ -57,9 +59,9 @@ const T* components_storage::get_entity_component( const eid_t id ) const {
 }
 
 template < typename T, typename... Ts >
-T& components_storage::set_entity_component( const eid_t id, const T& c ) {
+T& components_storage::set_entity_component( eid_t id, const T& t ) {
   auto& storage = get_or_create_storage< T >();
-  return storage[ id ] = c;
+  return storage[ id ] = t;
 }
 
 template < typename T >
@@ -103,7 +105,7 @@ bool components_storage::exists_all( const eid_t id ) const {
 }
 
 template < typename... Cs, typename Ft >
-void components_storage::join( Ft&& f ) {
+void components_storage::join( Ft f ) {
   // The components are already in hand for the walked storage, so they are passed
   // through directly rather than looked up again.
   detail::walk_required< components_storage, Cs... >( *this, [ & ]( const eid_t id, const Cs&... cs ) {
@@ -123,7 +125,7 @@ components_storage::join_exclude_wrapper< Ts... >::join_exclude_wrapper( compone
 
 template < typename... Ts >
 template < typename... TsEx, typename Ft >
-void components_storage::join_exclude_wrapper< Ts... >::exclude( Ft&& func ) {
+void components_storage::join_exclude_wrapper< Ts... >::exclude( Ft func ) {
   // Candidates come from the joined components; each is then rejected if any of
   // the excluded components is present. A component no entity carries rejects
   // nothing, which falls out of the test instead of needing a special case.

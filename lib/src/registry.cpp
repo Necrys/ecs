@@ -4,10 +4,7 @@
 
 namespace ecs {
 
-registry::registry() :
-  m_entityIdCounter( 0 ),
-  m_rebuildDependencyTree( false ) {
-}
+registry::registry() = default;
 
 entity registry::allocate() {
   eid_t id = entity::bad_id;

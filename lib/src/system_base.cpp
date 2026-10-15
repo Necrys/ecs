@@ -2,10 +2,7 @@
 
 namespace ecs {
 
-system_base::system_base() :
-  m_updated( false ),
-  m_enabled( true ) {
-}
+system_base::system_base() = default;
 
 // The key function: every other virtual member is inline or pure, so without this
 // definition the vtable would be a weak copy in every translation unit that uses a

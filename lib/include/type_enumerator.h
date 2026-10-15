@@ -12,15 +12,17 @@ public:
   static size_t type_collection_enumerator;
 
   template < typename... >
-  inline static size_t type_collection_id() {
+  static size_t type_collection_id() noexcept {
     static size_t cid = type_collection_enumerator++;
     return cid;
   }
 
-public:
+  // noexcept because that is the truth, and because component_type<T>::id is
+  // initialised by a call to this: a static initialiser that can throw is a trap
+  // (bugprone-throwing-static-initialization), and this one cannot.
   template < typename... Ts >
-  inline static size_t type_id() {
-    static size_t tid = type_collection_id< typename std::decay< Ts >::type... >();
+  static size_t type_id() noexcept {
+    static size_t tid = type_collection_id< std::decay_t< Ts >... >();
     return tid;
   }
 };
