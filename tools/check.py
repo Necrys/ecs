@@ -124,13 +124,21 @@ class Shell:
 
         if os.name != "nt":
             return None
-        # Nothing to load when the environment is already there: a developer
-        # command prompt, or a CI image that set it up.
-        if shutil.which("cl") is not None or shutil.which("clang-cl") is not None:
+
+        # vcvars sets these two, so their presence is what "the environment is
+        # already loaded" means - a developer command prompt, or a build that was
+        # started from one. Asking whether some compiler is on PATH is not the same
+        # question: a machine with clang-cl installed but no MSVC environment
+        # answered yes to that and then had no cl.exe for the presets that pin it.
+        if os.environ.get("VCINSTALLDIR") or os.environ.get("VSCMD_VER"):
             return None
 
         self.vcvars = find_vcvars()
         if self.vcvars is None:
+            # No Visual Studio to ask, but a compiler is reachable: a standalone
+            # toolchain on PATH is a legitimate way to have one.
+            if shutil.which("cl") is not None or shutil.which("clang-cl") is not None:
+                return None
             raise EnvironmentError(
                 "No MSVC environment found. Install Visual Studio with the C++ workload, "
                 "set VCVARS to a vcvars64.bat, or run this from a developer command prompt."
