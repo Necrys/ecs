@@ -71,6 +71,17 @@ foreach ( target ${tests} )
 
   ecs_set_warnings ( ${target} )
 
+  # An instrumented executable has to find its runtime, and the DLL that matches
+  # an import library is the one from the compiler that produced it - another
+  # toolchain ships a DLL of the same name. Copying it next to the executable
+  # makes the run independent of PATH. See cmake/Sanitizers.cmake.
+  if ( ECS_ASAN_RUNTIME_DLL )
+    add_custom_command( TARGET ${target} POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different "${ECS_ASAN_RUNTIME_DLL}" "$<TARGET_FILE_DIR:${target}>"
+      COMMENT "Copying the ASan runtime next to ${target}"
+    )
+  endif()
+
   if ( CMAKE_CXX_COMPILER_ID MATCHES "MSVC" )
     target_compile_definitions ( ${target}
       PRIVATE

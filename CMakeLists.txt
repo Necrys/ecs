@@ -1,15 +1,19 @@
 cmake_minimum_required ( VERSION 3.12.1 FATAL_ERROR )
 project ( ecs LANGUAGES CXX )
 
-list ( APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/cmake )
-include ( CompilerWarnings )
-
 option( ECS_BUILD_TESTS "Build tests" ON )
 
 # Benchmarks are off by default: they are run deliberately, locally, and their
 # results are compared against a recorded baseline rather than checked on every
 # build.
 option( ECS_BUILD_BENCHMARKS "Build benchmarks" OFF )
+
+# The build modules are included after the options they depend on: a sanitizer
+# configuration refuses to combine with benchmarks, so ECS_BUILD_BENCHMARKS has
+# to be known by the time Sanitizers.cmake runs.
+list ( APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/cmake )
+include ( CompilerWarnings )
+include ( Sanitizers )
 
 # C++17 rather than C++11: the test framework (Catch2 v3) requires at least
 # C++14, so the standard has to move anyway, and going straight to 17 avoids a

@@ -74,6 +74,26 @@
         "ECS_BUILD_TESTS": "ON",
         "ECS_BUILD_BENCHMARKS": "OFF"
       }
+    },
+    {
+      "name": "msvc-asan",
+      "displayName": "MSVC + AddressSanitizer (Debug, tests)",
+      "description": "The memory check on Windows. clang's ASan runtime cannot intercept here and its UBSan runtime refuses the /MD objects, so both are refused on this platform; see cmake/Sanitizers.cmake.",
+      "inherits": "tests-only",
+      "cacheVariables": {
+        "ECS_ENABLE_ASAN": "ON"
+      }
+    },
+    {
+      "name": "tidy",
+      "displayName": "Clang (MSVC mode), compile database (Debug, tests)",
+      "description": "Nothing is compiled here: this configuration exists to produce compile_commands.json, which tools/check.py feeds to clang-tidy. Running the tool through the compile database keeps it away from the MSVC frontend flags that clang-tidy cannot re-parse.",
+      "inherits": "tests-only",
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "clang-cl",
+        "CMAKE_CXX_COMPILER": "clang-cl",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+      }
     }
   ],
 
@@ -83,6 +103,8 @@
     { "name": "clang", "configurePreset": "clang" },
     { "name": "gcc", "configurePreset": "gcc" },
     { "name": "gcc-pi", "configurePreset": "gcc-pi" },
-    { "name": "tests-only", "configurePreset": "tests-only" }
+    { "name": "tests-only", "configurePreset": "tests-only" },
+    { "name": "msvc-asan", "configurePreset": "msvc-asan" },
+    { "name": "tidy", "configurePreset": "tidy" }
   ]
 }
