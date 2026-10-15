@@ -4,6 +4,6 @@
 
 namespace ecs {
 
-  using eid_t = uint32_t;
+using eid_t = uint32_t;
 
 }

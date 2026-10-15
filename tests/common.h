@@ -2,38 +2,45 @@
 
 struct Position {
   float x, y;
-  
-  Position() {}
-  Position( const float _x, const float _y ):
-    x( _x ), y( _y ) {}
 
-  bool operator== ( const Position& other ) const {
+  Position() {
+  }
+  Position( const float _x, const float _y ) :
+    x( _x ),
+    y( _y ) {
+  }
+
+  bool operator==( const Position& other ) const {
     return x == other.x && y == other.y;
   }
 };
 
 struct Velocity {
   float x, y;
-  
-  Velocity() {}
-  Velocity( const float _x, const float _y ):
-    x( _x ), y( _y ) {}
 
-  bool operator== ( const Velocity& other ) const {
+  Velocity() {
+  }
+  Velocity( const float _x, const float _y ) :
+    x( _x ),
+    y( _y ) {
+  }
+
+  bool operator==( const Velocity& other ) const {
     return x == other.x && y == other.y;
   }
 };
 
-struct Event {
-};
+struct Event {};
 
 // A second value component, used where a test needs two independent storages.
 struct Tag {
   int value;
 
-  Tag() {}
-  Tag( const int v ):
-    value( v ) {}
+  Tag() {
+  }
+  Tag( const int v ) :
+    value( v ) {
+  }
 };
 
 class System {

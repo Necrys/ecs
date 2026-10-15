@@ -4,7 +4,7 @@
 
 namespace ecs {
 
-registry::registry():
+registry::registry() :
   m_entityIdCounter( 0 ),
   m_rebuildDependencyTree( false ) {
 }
@@ -59,8 +59,8 @@ void registry::update() {
   std::vector< std::shared_ptr< system_base > > toUpdate( m_systems.begin(), m_systems.end() );
   while ( !toUpdate.empty() ) {
     auto it = toUpdate.begin();
-    for (; it != toUpdate.end(); ++it ) {
-      if ( *it && (*it)->ready() ) {
+    for ( ; it != toUpdate.end(); ++it ) {
+      if ( *it && ( *it )->ready() ) {
         break;
       }
     }
@@ -70,14 +70,14 @@ void registry::update() {
       return;
     }
 
-    if ( (*it)->enabled() ) {
-      (*it)->update();
+    if ( ( *it )->enabled() ) {
+      ( *it )->update();
     }
 
     toUpdate.erase( it );
   }
 
-  for ( auto& s: m_systems ) {
+  for ( auto& s : m_systems ) {
     s->reset_update();
   }
 }

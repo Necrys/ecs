@@ -2,7 +2,7 @@
 
 namespace ecs {
 
-system_base::system_base():
+system_base::system_base() :
   m_updated( false ),
   m_enabled( true ) {
 }

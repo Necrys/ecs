@@ -20,7 +20,7 @@ public:
 public:
   template < typename... Ts >
   inline static size_t type_id() {
-    static size_t tid = type_collection_id < typename std::decay< Ts >::type... >();
+    static size_t tid = type_collection_id< typename std::decay< Ts >::type... >();
     return tid;
   }
 };

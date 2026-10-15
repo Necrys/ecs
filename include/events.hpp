@@ -3,7 +3,7 @@
 namespace ecs {
 
 template < typename E >
-event_handler< E >::event_handler( registry& r ):
+event_handler< E >::event_handler( registry& r ) :
   m_current( 0 ),
   m_registry( r ) {
 }
@@ -16,7 +16,7 @@ void event_handler< E >::subscribe( F&& f, const size_t sid ) {
 
 template < typename E >
 template < typename... Args >
-void event_handler< E >::enqueue( Args&& ...args ) {
+void event_handler< E >::enqueue( Args&&... args ) {
   m_events[ ( m_current + 1 ) % 2 ].emplace_back( std::forward< Args >( args )... );
 }
 

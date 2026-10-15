@@ -2,7 +2,7 @@
 
 namespace ecs {
 
-entity::entity( const eid_t id, registry* owner ):
+entity::entity( const eid_t id, registry* owner ) :
   m_owner( owner ),
   m_id( id ) {
 }

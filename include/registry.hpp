@@ -9,7 +9,7 @@
 namespace ecs {
 
 template < typename S, typename... Args >
-system_configure< system_wrapper< S > > registry::add_system( Args&& ...args ) {
+system_configure< system_wrapper< S > > registry::add_system( Args&&... args ) {
   const auto sid = type_collection< systems >::type_id< S >();
   if ( m_systems.size() <= sid ) {
     m_systems.resize( sid + 1 );
@@ -32,18 +32,14 @@ template < typename S, typename E >
 void registry::register_system( system_wrapper< S >& system ) {
   const auto sid = type_collection< systems >::type_id< S >();
   auto& h = get_or_create_handler< E >();
-  h.subscribe( [ &system ]( const E& e ){
-    system.get().handle_event( e );
-  }, sid );
+  h.subscribe( [ &system ]( const E& e ) { system.get().handle_event( e ); }, sid );
 }
 
 template < typename S, typename E, typename... Rs >
 typename std::enable_if< ( sizeof...( Rs ) > 0 ) >::type registry::register_system( system_wrapper< S >& system ) {
   const auto sid = type_collection< systems >::type_id< S >();
   auto& h = get_or_create_handler< E >();
-  h.subscribe( [ &system ]( const E& e ){
-    system.get().handle_event( e );
-  }, sid );
+  h.subscribe( [ &system ]( const E& e ) { system.get().handle_event( e ); }, sid );
 
   register_system< S, Rs... >( system );
 }
@@ -77,7 +73,7 @@ event_handler< E >& registry::get_or_create_handler() {
 }
 
 template < typename E, typename... Args >
-void registry::push_event( Args&& ...args ) {
+void registry::push_event( Args&&... args ) {
   auto eid = type_collection< events >::type_id< E >();
   if ( m_handlers.size() <= eid || !m_handlers[ eid ] ) {
     return;

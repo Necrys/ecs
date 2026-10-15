@@ -10,7 +10,7 @@ namespace ecs {
 //
 //=============================================================================
 template < typename T, typename... Args >
-system_wrapper< T, Args... >::system_wrapper( Args&& ...args ):
+system_wrapper< T, Args... >::system_wrapper( Args&&... args ) :
   system_base(),
   m_system( std::forward< Args >( args )... ) {
 }
@@ -32,7 +32,7 @@ void system_wrapper< T, Args... >::update() {
 //
 //=============================================================================
 template < typename T >
-system_configure< T >::system_configure( T& system_wrap, registry& r ):
+system_configure< T >::system_configure( T& system_wrap, registry& r ) :
   m_system( system_wrap ),
   m_registry( r ) {
 }

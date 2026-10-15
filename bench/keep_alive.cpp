@@ -17,7 +17,7 @@ extern "C" void bench_keep_alive( void const volatile* value ) {
   // observably used, which clang otherwise warns about.
   static void const volatile* volatile sink = nullptr;
   sink = value;
-  ( void ) sink;
+  ( void )sink;
 }
 
 #endif
