@@ -413,6 +413,8 @@ TEST_CASE( "element_lifetime", "[unit][regression][d3]" ) {
   }
 }
 
+namespace {
+
 // Every position in the page must agree with what the test expects: the slots
 // that exist, the values they hold, and the number of live objects. Kept out of
 // the case body so that the case reads as the sequence of steps it is.
@@ -428,6 +430,8 @@ void require_page_matches(
       REQUIRE( v.get_unsafe( pos ).value == expected.at( pos ) );
     }
   }
+}
+
 }
 
 TEST_CASE( "page_positions_stay_paired_with_their_values", "[unit][regression][d15]" ) {
