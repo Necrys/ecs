@@ -59,15 +59,22 @@ BUILD_DIR = REPO_ROOT / "build" / PRESET
 # Nothing under these paths is ours to be measured by the library's number.
 EXCLUDE_PATTERN = r"(^|[\\/])(tests|build|_deps)[\\/]"
 
-# The floor, measured rather than chosen: the numbers are the first full run on
-# 15.10.2026 after the dependency machinery and the const accessors were covered,
-# and they only move up. Lowering one is a decision, not a maintenance step.
+# The floor, measured rather than chosen: the numbers are each platform's first
+# full run on 15.10.2026 after the dependency machinery and the const accessors were
+# covered, and they only move up. Lowering one is a decision, not a maintenance step.
 #
-# Lines are at 100% because the last uncovered one - the throw for an exhausted
-# entity id space - is now exercised by an ordinary run: its case is tagged [slow]
-# and registered like any other, and the whole space is handed out in about 15 s in
-# Release and 67 s in MSVC Debug. There is no partial mode, so a new library line
-# that no test reaches fails the gate rather than being excused by a flag.
+# Lines are at 100% everywhere because the last uncovered one - the throw for an
+# exhausted entity id space - is exercised by an ordinary run: its case is tagged
+# [slow] and registered like any other, and the whole space is handed out in about
+# 15 s in Release and 67 s in MSVC Debug. There is no partial mode, so a new library
+# line that no test reaches fails the gate rather than being excused by a flag.
+#
+# Branches are per preset, because the metric is not comparable across ABIs. On the
+# Itanium ABI every call that can throw gets a landing pad, so the Linux build
+# instruments 254 branches where clang-cl instruments 214, and the cold ones are
+# never taken by a test that passes: 85.04% against 91.59%, for the same code and
+# the same tests. Neither number is the better one - they count different things -
+# so each platform holds its own line.
 #
 # The function percentage is dominated by template instantiations - one per
 # component pack in selection.hpp, storage.hpp and sparse_vector.hpp - so it says
@@ -75,9 +82,19 @@ EXCLUDE_PATTERN = r"(^|[\\/])(tests|build|_deps)[\\/]"
 # branches are the figures to work from; branches sit well below 100% because the
 # compiler emits arcs for exceptions, static initialisation and short-circuit
 # operators, where the source has nothing to decide.
-MIN_FUNCTIONS_PCT = 77.0
-MIN_LINES_PCT = 100.0
-MIN_BRANCHES_PCT = 91.5
+FLOORS: dict[str, tuple[float, float, float]] = {
+    # preset: (functions, lines, branches)
+    "coverage": (77.0, 100.0, 91.5),          # clang-cl on Windows, the MSVC ABI
+    "linux-coverage": (77.0, 100.0, 85.0),    # clang on Linux, the Itanium ABI
+}
+
+# A preset this file has not measured gets the loosest branch line and says so when
+# it checks, rather than silently holding a platform to a number taken elsewhere.
+DEFAULT_FLOOR = (77.0, 100.0, 85.0)
+
+
+def floors_for(preset: str) -> tuple[float, float, float]:
+    return FLOORS.get(preset, DEFAULT_FLOOR)
 
 
 def find_llvm_tool(name: str) -> str | None:
@@ -397,13 +414,14 @@ def main() -> int:
 
     # The verdict is part of the report: written before the exit code is decided, so
     # a run that fails the floor still leaves a summary behind for the dashboard.
+    min_functions, min_lines, min_branches = floors_for( PRESET )
     failures = []
-    if function_pct + 1e-9 < MIN_FUNCTIONS_PCT:
-        failures.append(f"functions {function_pct:.2f}% < {MIN_FUNCTIONS_PCT:.2f}%")
-    if line_pct + 1e-9 < MIN_LINES_PCT:
-        failures.append(f"lines {line_pct:.2f}% < {MIN_LINES_PCT:.2f}%")
-    if branch_pct + 1e-9 < MIN_BRANCHES_PCT:
-        failures.append(f"branches {branch_pct:.2f}% < {MIN_BRANCHES_PCT:.2f}%")
+    if function_pct + 1e-9 < min_functions:
+        failures.append(f"functions {function_pct:.2f}% < {min_functions:.2f}%")
+    if line_pct + 1e-9 < min_lines:
+        failures.append(f"lines {line_pct:.2f}% < {min_lines:.2f}%")
+    if branch_pct + 1e-9 < min_branches:
+        failures.append(f"branches {branch_pct:.2f}% < {min_branches:.2f}%")
 
     if args.summary:
         write_summary(
@@ -412,6 +430,7 @@ def main() -> int:
             (total_lines, total_lines_hit, line_pct),
             (total_functions, total_functions_hit, function_pct),
             (total_branches, total_branches_hit, branch_pct),
+            (min_functions, min_lines, min_branches),
             failures,
         )
 
@@ -432,13 +451,15 @@ def write_summary(
     lines: tuple[int, int, float],
     functions: tuple[int, int, float],
     branches: tuple[int, int, float],
+    floor: tuple[float, float, float],
     failures: list[str],
 ) -> None:
     """Write the numbers as markdown, for a CI run summary."""
+    min_functions, min_lines, min_branches = floor
     verdict = (
         "Below the floor: " + "; ".join(failures)
         if failures
-        else f"Meets the floor ({MIN_LINES_PCT:.1f}% lines, {MIN_BRANCHES_PCT:.1f}% branches)."
+        else f"Meets the floor ({min_lines:.1f}% lines, {min_branches:.1f}% branches, {min_functions:.1f}% functions)."
     )
     rows = [("Lines", lines), ("Functions", functions), ("Branches", branches)]
     text = [
