@@ -75,6 +75,38 @@ A caveat: this is an ideal to reach for, not a licence for unreadable
 metaprogramming. If a compile-time construction becomes impossible to follow, say
 so and discuss it rather than layering more machinery on top.
 
+### Tests observe, they do not accommodate
+
+The library must not know that tests exist. Do not add an accessor, a hook, a
+flag or a widened type purely so that a test can reach something. A test that
+needs the library changed to be written is pointing at either the wrong thing to
+test or a genuine gap in the public surface - and a gap is closed for users, not
+for tests.
+
+The architecture is expected to be flexible enough that the behaviour is
+testable as it stands, through its public surface. If it is not, that is feedback
+about the design.
+
+Each unit test stands on its own:
+
+- it builds its own world and depends on no state left behind by another test;
+- it does not rely on the order tests happen to run in;
+- it asserts observable behaviour rather than internals, so a refactor that keeps
+  the contract does not break it.
+
+### Library first, tests as a separate commit
+
+When fixing a defect or adding behaviour, the change lands in two steps:
+
+1. the library change;
+2. the tests that cover it, as a separate commit - typically regression tests for
+   a fix, or new coverage for new behaviour.
+
+This keeps the two concerns separately reviewable and makes the tests explicit
+rather than an afterthought folded into the implementation. Run the full suite
+before a library change and again after it; for a large change, rerun everything
+rather than trusting a subset.
+
 ---
 
 ## Branches and commits

@@ -244,11 +244,44 @@ and that is not solved by making the ordinary container heavier.
 
 ---
 
-## 7. Checklist before committing
+## 7. Tests
+
+The library must not know that tests exist: no accessors, hooks or flags added so
+that a test can reach something. Tests exercise the public surface and assert
+observable behaviour, so that a refactor preserving the contract does not break
+them.
+
+```cpp
+// wrong: the library grows an accessor so the test can reach the bound
+const size_t bound = r.system_count();
+REQUIRE( r.is_system_active( bound ) == false );
+
+// right: the test states the contract, using what the library already offers
+REQUIRE( r.is_system_active( 1024 ) == false );
+```
+
+Each test builds its own world:
+
+- no reliance on state left behind by another test, and no reliance on the order
+  tests run in - in particular, ids assigned by first use are not a stable
+  anchor, so do not derive one expectation from a type id another test may have
+  influenced;
+- assert what a caller can observe, not what the internals happen to look like;
+- one section, one scenario; a failing test should name the behaviour that broke.
+
+Order of work when changing the library: land the library change first, then the
+tests as a separate commit. That applies both to a fix and to new behaviour, and
+it keeps the two concerns separately reviewable. Run the full suite before the
+change and after it; for a large change, rerun everything rather than a subset.
+
+---
+
+## 8. Checklist before committing
 
 1. `./tools/format.ps1` (or `python tools/format.py`) - the code is formatted.
 2. The build is warning-free at the highest warning level.
 3. The tests pass; a regression test was added for the fixed defect.
-4. Comments do not restate the code and contain no history.
-5. No commented-out code, debug output or dead members.
-6. A change on the hot path is backed by a measurement.
+4. No accessor, hook or flag was added to the library for a test's convenience.
+5. Comments do not restate the code and contain no history.
+6. No commented-out code, debug output or dead members.
+7. A change on the hot path is backed by a measurement.
