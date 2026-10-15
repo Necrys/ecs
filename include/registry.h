@@ -58,12 +58,6 @@ namespace ecs {
 
     bool is_system_active( const size_t sid ) const;
 
-    // Number of system slots, which is the exclusive upper bound for sid. Every
-    // id at or above it is inactive; without this the boundary is not
-    // expressible from outside, since the storage grows with the highest type id
-    // in use rather than with the number of registered systems.
-    size_t system_count() const;
-
   private:
     template < typename S, typename E >
     void register_system( system_wrapper< S >& system );

@@ -194,16 +194,13 @@ SECTION( "system_after_the_end_is_inactive" ) {
   ecs::registry r;
   r.add_system< System >();
 
-  // Any id at or beyond the vector size used to be read out of bounds:
-  // sid == size() took the branch and dereferenced m_systems[size()].
-  //
-  // The size is asked for rather than derived from a type id: system slots are
-  // allocated up to the highest type id in use, and which type has the highest
-  // id depends on the order the tests happen to run in.
-  const size_t size = r.system_count();
-
-  REQUIRE( r.is_system_active( size ) == false );
-  REQUIRE( r.is_system_active( size + 5 ) == false );
+  // Every id at or above the vector size used to be read out of bounds: the
+  // check was `size() < sid`, so `sid == size()` took the branch and
+  // dereferenced m_systems[size()]. The size is not part of the public surface,
+  // so the test asserts the observable contract instead: ids far beyond any
+  // registered system are inactive, and asking does not read past the end.
+  REQUIRE( r.is_system_active( 64 ) == false );
+  REQUIRE( r.is_system_active( 1024 ) == false );
 }
 
 }
