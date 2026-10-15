@@ -228,10 +228,147 @@ TEST_CASE( "events" ) {
     ecs::registry r;
     r.add_system< CountingSystem >().handles< Event >();
 
+    // The counter is static, so the test asserts on the change it caused rather
+    // than on an absolute value: sections do not run in a promised order.
+    const int before = CountingSystem::received;
+
     r.push_event< Event >( Event{} );
     r.update();
 
-    REQUIRE( CountingSystem::received == 1 );
+    REQUIRE( CountingSystem::received == before + 1 );
+  }
+
+  // Nothing subscribes, so there is no queue to put the event in. Documented
+  // behaviour today is to drop it silently - see D11 in the plan's registry for
+  // making that visible - and the test pins the part that matters meanwhile:
+  // publishing without a subscriber must not crash or reach anybody later.
+  SECTION( "no_subscriber_is_not_an_error" ) {
+    ecs::registry r;
+    const int before = CountingSystem::received;
+
+    r.push_event< Event >( Event{} );
+    r.update();
+
+    REQUIRE( CountingSystem::received == before );
+  }
+}
+
+// Coverage for the dependency tree itself: a system that depends on another must
+// run after it, which is the observable effect of the graph the registry builds.
+TEST_CASE( "system_dependencies" ) {
+  SECTION( "dependency_runs_first" ) {
+    ecs::registry r;
+    r.add_system< TaggedSystem< 1 > >().depends_on< TaggedSystem< 2 > >();
+    r.add_system< TaggedSystem< 2 > >();
+    update_sequence().clear();
+
+    r.update();
+
+    REQUIRE( update_sequence() == std::vector< int >{ 2, 1 } );
+  }
+
+  // A disabled dependency never updates, so the dependent system must not wait
+  // for it: the wait would deadlock the frame instead of skipping the system.
+  SECTION( "disabled_dependency_does_not_block" ) {
+    ecs::registry r;
+    r.add_system< TaggedSystem< 1 > >().depends_on< TaggedSystem< 2 > >();
+    r.add_system< TaggedSystem< 2 > >().depends_on< TaggedSystem< 3 > >();
+    r.add_system< TaggedSystem< 3 > >();
+    update_sequence().clear();
+
+    r.get_system< TaggedSystem< 2 > >().disable();
+    r.update();
+
+    // 2 is disabled, so it neither waits for 3 nor blocks 1: 3 runs because it
+    // is ready, then 1 runs because a disabled dependency counts as satisfied.
+    REQUIRE( update_sequence() == std::vector< int >{ 3, 1 } );
+  }
+
+  SECTION( "re_enabled_dependency_runs_again" ) {
+    ecs::registry r;
+    r.add_system< TaggedSystem< 1 > >().depends_on< TaggedSystem< 2 > >();
+    r.add_system< TaggedSystem< 2 > >();
+
+    r.get_system< TaggedSystem< 2 > >().disable();
+    update_sequence().clear();
+    r.update();
+    REQUIRE( update_sequence() == std::vector< int >{ 1 } );
+
+    r.get_system< TaggedSystem< 2 > >().enable();
+    update_sequence().clear();
+    r.update();
+
+    REQUIRE( update_sequence() == std::vector< int >{ 2, 1 } );
+  }
+
+  // A dependency whose id is inside the vector but whose slot is empty: the type
+  // was given an id by the type collection, yet was never added as a system to
+  // this registry. The dependency is skipped rather than dereferenced.
+  SECTION( "empty_dependency_slot_is_skipped" ) {
+    // Ids are handed out on first use and shared across the whole binary, so the
+    // order the test needs cannot be assumed: the empty slot's id is taken first,
+    // then a second type's id, which is necessarily higher, and only then is the
+    // vector grown past the first one.
+    const auto empty_sid = ecs::type_collection< ecs::systems >::type_id< UnregisteredSystem >();
+    const auto registered_sid = ecs::type_collection< ecs::systems >::type_id< TaggedSystem< 4 > >();
+    REQUIRE( empty_sid < registered_sid );
+
+    ecs::registry r;
+    r.add_system< TaggedSystem< 4 > >();
+    r.add_system< TaggedSystem< 1 > >().depends_on< UnregisteredSystem >();
+    update_sequence().clear();
+
+    r.update();
+
+    // An empty slot imposes no order: the dependency is skipped, so the system
+    // that named it is free to run in its own place - here slot 0 comes before
+    // slot 4.
+    REQUIRE( update_sequence() == std::vector< int >{ 1, 4 } );
+  }
+}
+
+// A handle is copyable and movable, and every copy refers to the same entity in
+// the same registry. The operations themselves are defaulted, so what is worth
+// pinning is the behaviour a user sees.
+TEST_CASE( "entity_handles" ) {
+  SECTION( "copies_refer_to_the_same_entity" ) {
+    ecs::registry r;
+    auto original = r.allocate();
+    original.add< Position >( 1.0f, 2.0f );
+
+    const auto copy = original;
+    const auto assigned = original;
+    auto move_source = original;
+    const auto moved = std::move( move_source );
+    auto assign_source = original;
+    auto move_assigned = r.allocate();
+    move_assigned = std::move( assign_source );
+
+    REQUIRE( copy.id() == original.id() );
+    REQUIRE( assigned.id() == original.id() );
+    REQUIRE( moved.id() == original.id() );
+    REQUIRE( move_assigned.id() == original.id() );
+
+    REQUIRE( copy.owner() == original.owner() );
+    REQUIRE( moved.owner() == original.owner() );
+
+    // The same entity, not a copy of its components.
+    REQUIRE( copy.get< Position >() == original.get< Position >() );
+  }
+
+  SECTION( "self_assignment_keeps_the_handle" ) {
+    ecs::registry r;
+    auto handle = r.allocate();
+    const auto id = handle.id();
+
+    // Through an alias on purpose: `handle = handle` is what the test means, and
+    // it is also the pattern -Wself-assign-overloaded exists to catch, which the
+    // build turns into an error.
+    auto& alias = handle;
+    handle = alias;
+
+    REQUIRE( handle.id() == id );
+    REQUIRE( handle.owner() == &r );
   }
 }
 

@@ -101,11 +101,16 @@ TEST_CASE( "access" ) {
     REQUIRE( *pc == ref );
   }
 
+  // The const overload is a separate function, so it needs a const object to be
+  // called at all: reading through a non-const storage tests the other one.
   SECTION( "get_const" ) {
     ecs::components_storage s;
     const auto& ref = s.add_entity_component< Position >( 200, 3.1415f, 2.7182f );
 
-    auto* const pc = s.get_entity_component< Position >( 200 );
+    const ecs::components_storage& view = s;
+    const auto* const pc = view.get_entity_component< Position >( 200 );
+
+    REQUIRE( pc != nullptr );
     REQUIRE( *pc == ref );
   }
 
@@ -121,7 +126,18 @@ TEST_CASE( "access" ) {
     ecs::components_storage s;
     s.add_entity_component< Position >( 201, 3.1415f, 2.7182f );
 
-    auto* const pc = s.get_entity_component< Position >( 200 );
+    const ecs::components_storage& view = s;
+    const auto* const pc = view.get_entity_component< Position >( 200 );
+
+    REQUIRE( pc == nullptr );
+  }
+
+  SECTION( "get_const_without_storage" ) {
+    ecs::components_storage s;
+
+    const ecs::components_storage& view = s;
+    const auto* const pc = view.get_entity_component< Position >( 200 );
+
     REQUIRE( pc == nullptr );
   }
 

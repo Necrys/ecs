@@ -331,6 +331,46 @@ TEST_CASE( "utility" ) {
   }
 }
 
+TEST_CASE( "each" ) {
+  SECTION( "visits_every_element_in_slot_order" ) {
+    ecs::sparse_vector< int > v;
+    v.emplace( 4, 40 );
+    v.emplace( 1, 10 );
+    v.emplace( 70, 700 );
+
+    std::vector< size_t > positions;
+    std::vector< int > values;
+
+    v.each( [ & ]( const size_t pos, const int value ) {
+      positions.push_back( pos );
+      values.push_back( value );
+      return true;
+    } );
+
+    REQUIRE( positions == std::vector< size_t >{ 1, 4, 70 } );
+    REQUIRE( values == std::vector< int >{ 10, 40, 700 } );
+  }
+
+  // The visitor asks to stop, and the walk has to obey: this is what lets a
+  // caller search for one element without paying for the rest.
+  SECTION( "stops_when_the_visitor_says_so" ) {
+    ecs::sparse_vector< int > v;
+    v.emplace( 4, 40 );
+    v.emplace( 1, 10 );
+    v.emplace( 70, 700 );
+
+    int visited = 0;
+
+    v.each( [ & ]( const size_t, const int value ) {
+      ++visited;
+      return value != 40;
+    } );
+
+    // 10 first, then 40, where the visitor stops: 700 is never visited.
+    REQUIRE( visited == 2 );
+  }
+}
+
 TEST_CASE( "element_lifetime" ) {
   SECTION( "destructor_destroys_elements" ) {
     REQUIRE( Counted::live == 0 );

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <vector>
+
 struct Position {
   float x, y;
 
@@ -62,5 +64,26 @@ public:
 
   void handle_event( const Event& ) {
     ++received;
+  }
+};
+
+// The order systems ran in, shared by every tag below, so a test can assert on
+// what dependencies did to the sequence.
+inline std::vector< int >& update_sequence() {
+  static std::vector< int > sequence;
+  return sequence;
+}
+
+// A system that appends its tag to the sequence when it updates. The tag is a
+// template parameter rather than a member because a system has to be a distinct
+// type for the registry to have a slot for it.
+template < int Tag >
+class TaggedSystem {
+public:
+  void update() {
+    update_sequence().push_back( Tag );
+  }
+
+  void handle_event( const Event& ) {
   }
 };
