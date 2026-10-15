@@ -1,7 +1,10 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <sparse_vector.h>
+
+#include <map>
 #include <utility>
+#include <vector>
 
 namespace {
 
@@ -373,6 +376,81 @@ SECTION( "erase_last_element_of_page_releases_page" ) {
     // The page becomes empty and is deleted, which used to lose the element.
     REQUIRE( Counted::live == 0 );
     REQUIRE( v.exist( 0 ) == false );
+}
+
+}
+
+// The page keeps its slots in a fixed order and records where each position
+// lives, so inserting or removing inside a page shuffles both the objects and
+// that record. Getting the two out of step used to surface as a position holding
+// a value that belonged to another one, and as two objects destroyed for a
+// single removal.
+//
+// The check below is driven purely through the public interface and asserts what
+// a caller can observe: which positions exist and what they hold.
+TEST_CASE( "page_slot_bookkeeping" ) {
+
+SECTION( "positions_stay_paired_with_their_values" ) {
+    struct Step {
+        bool insert;
+        size_t pos;
+        int value;
+    };
+
+    // Ascending first, then filling the gaps backwards, which lands insertions
+    // and removals in the middle of the page rather than at its end.
+    const std::vector< Step > steps = {
+        { true,  8, 100 }, { true, 10, 300 }, { true,  9, 200 },
+        { false, 8,   0 }, { true, 12, 500 }, { false, 10,  0 },
+        { true,  8, 400 }, { true, 11, 600 }, { false,  9,  0 },
+        { true, 10, 700 }, { false, 12,  0 }, { true, 13, 800 },
+    };
+
+    const size_t highest = 16;
+
+    ecs::sparse_vector< Counted > v;
+    std::map< size_t, int > expected;
+
+    for ( const auto& step : steps ) {
+        if ( step.insert ) {
+            v.emplace( step.pos, step.value );
+            expected[ step.pos ] = step.value;
+        }
+        else {
+            v.erase( step.pos );
+            expected.erase( step.pos );
+        }
+
+        for ( size_t pos = 0; pos < highest; ++pos ) {
+            CAPTURE( pos, step.pos );
+            REQUIRE( v.exist( pos ) == ( expected.count( pos ) != 0 ) );
+            if ( expected.count( pos ) != 0 ) {
+                REQUIRE( v.get_unsafe( pos ).value == expected.at( pos ) );
+            }
+        }
+
+        REQUIRE( Counted::live == static_cast< int >( expected.size() ) );
+    }
+}
+
+SECTION( "empty_page_after_removals" ) {
+    ecs::sparse_vector< Counted > v;
+
+    v.emplace( 3, 10 );
+    v.emplace( 5, 20 );
+    v.emplace( 4, 30 );
+
+    REQUIRE( Counted::live == 3 );
+
+    v.erase( 3 );
+    v.erase( 4 );
+    v.erase( 5 );
+
+    // Every position gone, so the page is released and nothing survives it.
+    REQUIRE( Counted::live == 0 );
+    REQUIRE( v.exist( 3 ) == false );
+    REQUIRE( v.exist( 4 ) == false );
+    REQUIRE( v.exist( 5 ) == false );
 }
 
 }
