@@ -6,6 +6,9 @@
 #include <set>
 #include <memory>
 
+#include <deque>
+#include <unordered_set>
+
 namespace ecs {
   class entity;
 
@@ -74,9 +77,12 @@ namespace ecs {
     event_handler< E >& get_or_create_handler();
 
     /* entities */
-    std::list< eid_t > m_freeEntityIds;
-    components_storage m_components;
-    eid_t              m_entityIdCounter;
+    // A set answers "is this id already free" in constant time; the queue keeps
+    // ids in the order they were released so allocation stays FIFO.
+    std::unordered_set< eid_t > m_freeEntityIds;
+    std::deque< eid_t >         m_freeEntityIdQueue;
+    components_storage          m_components;
+    eid_t                       m_entityIdCounter;
 
     /* systems */
     std::vector< std::shared_ptr< system_base > > m_systems;

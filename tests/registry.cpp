@@ -4,6 +4,8 @@
 
 #include <registry.h>
 
+#include <vector>
+
 TEST_CASE( "entity" ) {
 
 SECTION( "allocate" ) {
@@ -89,6 +91,60 @@ SECTION( "remove" ) {
   e.remove< Position >();
 
   REQUIRE( e.get< Position >() == nullptr );
+}
+
+}
+
+TEST_CASE( "entity_bulk_reuse" ) {
+
+// Regression coverage for the free-list lookup: it used to walk a growing list
+// on every deallocate, which made releasing N entities quadratic.
+SECTION( "mass_deallocate_and_reallocate" ) {
+  const int count = 5000;
+
+  ecs::registry r;
+  std::vector< ecs::eid_t > ids;
+  ids.reserve( count );
+
+  for ( int i = 0; i < count; ++i ) {
+    ids.push_back( r.allocate().id() );
+  }
+
+  for ( const auto id : ids ) {
+    r.deallocate( id );
+  }
+
+  // Releasing everything must hand the ids back in FIFO order, because the
+  // allocation order is part of the observable behaviour.
+  for ( int i = 0; i < count; ++i ) {
+    REQUIRE( r.allocate().id() == ids[ static_cast< size_t >( i ) ] );
+  }
+}
+
+SECTION( "double_release_is_ignored" ) {
+  ecs::registry r;
+
+  const auto first = r.allocate();
+  const auto second = r.allocate();
+
+  r.deallocate( first );
+  r.deallocate( first );   // must not queue the id twice
+  r.deallocate( second );
+
+  REQUIRE( r.allocate().id() == first.id() );
+  REQUIRE( r.allocate().id() == second.id() );
+}
+
+SECTION( "released_components_are_cleared" ) {
+  ecs::registry r;
+
+  auto e = r.allocate();
+  e.add< Position >( 1.0f, 2.0f );
+
+  r.deallocate( e );
+
+  const ecs::components_storage* cs = &r.components();
+  REQUIRE( cs->get_entity_component< Position >( e.id() ) == nullptr );
 }
 
 }

@@ -11,14 +11,15 @@ registry::registry():
 
 entity registry::allocate() {
   eid_t id;
-  if ( m_freeEntityIds.empty() ) {
+  if ( m_freeEntityIdQueue.empty() ) {
     if ( m_entityIdCounter == entity::bad_id ) {
       throw std::runtime_error( "No free entity available" );
     }
     id = m_entityIdCounter++;
   } else {
-    id = m_freeEntityIds.front();
-    m_freeEntityIds.pop_front();
+    id = m_freeEntityIdQueue.front();
+    m_freeEntityIdQueue.pop_front();
+    m_freeEntityIds.erase( id );
   }
 
   return entity( id, this );
@@ -29,13 +30,15 @@ void registry::deallocate( const entity& e ) {
 }
 
 void registry::deallocate( const eid_t id ) {
-  const auto& it = std::find( m_freeEntityIds.begin(), m_freeEntityIds.end(), id );
-  if ( it != m_freeEntityIds.end() ) {
+  // The set holds exactly the ids in the queue, so a single lookup answers both
+  // "already released" and the membership the queue needs.
+  const auto inserted = m_freeEntityIds.insert( id );
+  if ( !inserted.second ) {
     return;
   }
 
   m_components.remove_all_components( id );
-  m_freeEntityIds.push_back( id );
+  m_freeEntityIdQueue.push_back( id );
 }
 
 components_storage& registry::components() {
