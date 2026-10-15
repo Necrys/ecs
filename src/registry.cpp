@@ -103,14 +103,12 @@ bool registry::rebuild_system_dependency_tree() {
 }
 
 bool registry::is_system_active( const size_t sid ) const {
-  if ( m_systems.size() < sid ) {
-    const auto s = m_systems[ sid ];
-    if ( s && s->enabled() ) {
-      return true;
-    }
+  if ( sid >= m_systems.size() ) {
+    return false;
   }
 
-  return false;
+  const auto s = m_systems[ sid ];
+  return s && s->enabled();
 }
 
 }

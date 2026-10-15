@@ -35,3 +35,16 @@ public:
   void handle_event( const Event& ) {
   }
 };
+
+// Counts delivered events so tests can assert on event delivery.
+class CountingSystem {
+public:
+  static int received;
+
+  void update() {
+  }
+
+  void handle_event( const Event& ) {
+    ++received;
+  }
+};

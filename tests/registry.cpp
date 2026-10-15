@@ -103,3 +103,66 @@ SECTION( "register" ) {
 }
 
 }
+
+// Regression coverage for is_system_active(): the bounds check used to be
+// `size() < sid` with the element access inside the branch, so it read past the
+// end of the vector and reported every registered system as inactive, which
+// meant no event ever reached a subscriber.
+//
+// The checks below go through type_id() rather than hard-coded positions: a
+// system id depends on how many system types were registered before it, so
+// assuming a particular index makes the test depend on unrelated test cases.
+TEST_CASE( "system_activity" ) {
+
+SECTION( "registered_system_is_active" ) {
+  ecs::registry r;
+  r.add_system< System >();
+
+  const auto sid = ecs::type_collection< ecs::systems >::type_id< System >();
+
+  REQUIRE( r.is_system_active( sid ) == true );
+}
+
+SECTION( "disabled_system_is_inactive" ) {
+  ecs::registry r;
+  r.add_system< System >();
+
+  const auto sid = ecs::type_collection< ecs::systems >::type_id< System >();
+
+  r.get_system< System >().disable();
+
+  REQUIRE( r.is_system_active( sid ) == false );
+}
+
+SECTION( "system_after_the_end_is_inactive" ) {
+  ecs::registry r;
+  r.add_system< System >();
+
+  // Any id at or beyond the vector size used to be read out of bounds:
+  // sid == size() took the branch and dereferenced m_systems[size()].
+  //
+  // CountingSystem is the highest system type id in this binary, so its id plus
+  // one is exactly size() here, and anything beyond it is safely outside.
+  const auto past_the_end = ecs::type_collection< ecs::systems >::type_id< CountingSystem >() + 1;
+
+  REQUIRE( r.is_system_active( past_the_end ) == false );
+  REQUIRE( r.is_system_active( past_the_end + 5 ) == false );
+}
+
+}
+
+TEST_CASE( "events" ) {
+
+SECTION( "delivered_to_subscriber" ) {
+  ecs::registry r;
+  r.add_system< CountingSystem >().handles< Event >();
+
+  r.push_event< Event >( Event{} );
+  r.update();
+
+  REQUIRE( CountingSystem::received == 1 );
+}
+
+}
+
+int CountingSystem::received = 0;
