@@ -41,6 +41,16 @@ public:
 
   std::pair< size_t, size_t > index_range() const;
 
+  // Number of live elements, without walking the pages.
+  size_t size() const noexcept;
+
+  // Visits every live element in slot order, which is ascending id order, and
+  // stops early if the visitor asks it to. This is what makes iteration cost
+  // follow the number of elements rather than the spread of their ids: the walk
+  // skips the empty stretches entirely instead of testing each index in them.
+  template < typename F >
+  void each( F&& visitor ) const;
+
   void reserve( const size_t count );
 
 private:
@@ -68,6 +78,10 @@ private:
 
     size_t size() const;
 
+    // Slot-indexed access to the packed live range, used by sparse_vector::each.
+    size_t position( const size_t slot ) const noexcept;
+    const T& value( const size_t slot ) const noexcept;
+
   private:
     template < typename... Args >
     void take_place( const size_t pos, Args&&... args );
@@ -84,6 +98,10 @@ private:
   void clear_and_release();
 
   std::vector< page* > m_pages;
+
+  // Maintained on every mutation so that the walk can pick the storage with the
+  // fewest elements without touching the pages first.
+  size_t m_size = 0;
 };
 
 template < typename T, size_t PageSize >

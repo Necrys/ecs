@@ -5,7 +5,8 @@
 #include "sparse_vector.h"
 
 #include <type_traits>
-#include <map>
+#include <utility>
+#include <vector>
 
 namespace ecs {
   struct component_storages {};
@@ -19,25 +20,16 @@ namespace ecs {
   template < typename T >
   const size_t component_type< T >::id = type_collection< component_storages >::type_id< T >();
 
+  class components_storage;
+
   class components_storage {
+    // Presents one selection step: the components to walk, and the components to
+    // reject. Returned by join(), so that the two read as one expression.
     template < typename... Ts >
     class join_exclude_wrapper {
-    private:
-      template < class Ft, class... Rs >
-      void join_impl( const eid_t id, Ft&& f, Rs&&... rs );
-
-      template < class T, class... TsJoin, class Ft, class... Rs >
-      void join_impl( const eid_t id, Ft&& f, Rs&&... rs );
-
-      template < class Ft >
-      void exclude_impl( const eid_t id, Ft&& f );
-
-      template < class T, class... TsEx, class Ft >
-      void exclude_impl( const eid_t id, Ft&& f );
-
     public:
-      join_exclude_wrapper( components_storage& storage );
-    
+      explicit join_exclude_wrapper( components_storage& storage );
+
       template < typename... TsEx, typename Ft >
       void exclude( Ft&& func );
 
@@ -67,6 +59,14 @@ namespace ecs {
     template < typename T >
     const T* get_entity_component( const eid_t id ) const;
 
+    // The typed view of one component's storage, or null when the type has never
+    // been used. Public because a selection has to reach it from outside the
+    // class, and because it is the honest description of what the container
+    // holds: one storage per component type.
+    template < typename T >
+    sparse_vector< T >* get_storage() const;
+
+    /* selection */
     template < typename... Cs, typename Ft >
     void join( Ft&& func );
 
@@ -75,22 +75,11 @@ namespace ecs {
 
   private:
     template < typename T >
-    sparse_vector< T >* get_storage() const;
-
-    template < typename T >
     sparse_vector< T >& get_or_create_storage();
 
-    template < class Ft, class... Rs >
-    void join_impl( const eid_t id, Ft&& f, Rs&&... rs );
-
-    template < class T, class... Ts, class Ft, class... Rs >
-    void join_impl( const eid_t id, Ft&& f, Rs&&... rs );
-
-    template < class T >
-    bool get_index_range( eid_t& min_index, eid_t& max_index );
-
-    template < class T, class... Rs >
-    typename std::enable_if< sizeof...( Rs ) != 0, bool >::type get_index_range( eid_t& min_index, eid_t& max_index );
+    // True when every listed component is present on the id.
+    template < class... Cs >
+    bool exists_all( const eid_t id ) const;
 
     std::vector< sparse_vector_base* > m_componentStorages;
   };

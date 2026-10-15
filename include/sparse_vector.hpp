@@ -38,7 +38,13 @@ T& sparse_vector< T, PageSize >::insert( const size_t pos, const T& arg ) {
   assert( pos < bad_index );
 
   auto& pg = get_or_create_page( pos / PageSize );
-  return pg.insert( pos % PageSize, arg );
+  const bool added = !pg.exist( pos % PageSize );
+  T& result = pg.insert( pos % PageSize, arg );
+  if ( added ) {
+    ++m_size;
+  }
+
+  return result;
 }
 
 template < typename T, size_t PageSize >
@@ -47,7 +53,13 @@ T& sparse_vector< T, PageSize >::emplace( const size_t pos, Args&&... args ) {
   assert( pos < bad_index );
 
   auto& pg = get_or_create_page( pos / PageSize );
-  return pg.emplace( pos % PageSize, std::forward< Args >( args )... );
+  const bool added = !pg.exist( pos % PageSize );
+  T& result = pg.emplace( pos % PageSize, std::forward< Args >( args )... );
+  if ( added ) {
+    ++m_size;
+  }
+
+  return result;
 }
 
 template < typename T, size_t PageSize >
@@ -57,7 +69,11 @@ void sparse_vector< T, PageSize >::erase( const size_t pos ) {
   size_t page_idx = pos / PageSize;
   auto pg = get_page( page_idx );
   if ( pg ) {
+    const bool removed = pg->exist( pos % PageSize );
     pg->erase( pos % PageSize );
+    if ( removed ) {
+      --m_size;
+    }
     if ( pg->size() == 0 ) {
       erase_page( page_idx );
     }
@@ -101,7 +117,40 @@ T& sparse_vector< T, PageSize >::operator[] ( const size_t pos ) {
   assert( pos < bad_index );
 
   auto& pg = get_or_create_page( pos / PageSize );
-  return pg[ pos % PageSize ];
+  const bool added = !pg.exist( pos % PageSize );
+  T& result = pg[ pos % PageSize ];
+  if ( added ) {
+    ++m_size;
+  }
+
+  return result;
+}
+
+template < typename T, size_t PageSize >
+size_t sparse_vector< T, PageSize >::size() const noexcept {
+  return m_size;
+}
+
+template < typename T, size_t PageSize >
+template < typename F >
+void sparse_vector< T, PageSize >::each( F&& visitor ) const {
+  for ( size_t page_idx = 0; page_idx < m_pages.size(); ++page_idx ) {
+    const page* pg = m_pages[ page_idx ];
+    if ( !pg ) {
+      continue;
+    }
+
+    // A page keeps its live objects packed into the front of m_data and records
+    // the position of each in m_back_index, so this walks the live elements
+    // directly: no testing of indices that hold nothing.
+    const size_t base = page_idx * PageSize;
+    const size_t count = pg->size();
+    for ( size_t slot = 0; slot < count; ++slot ) {
+      if ( !visitor( base + pg->position( slot ), pg->value( slot ) ) ) {
+        return;
+      }
+    }
+  }
 }
 
 template < typename T, size_t PageSize >
@@ -149,6 +198,8 @@ void sparse_vector< T, PageSize >::clear_and_release() {
     delete pg;
     pg = nullptr;
   }
+
+  m_size = 0;
 }
 
 template < typename T, size_t PageSize >
@@ -321,6 +372,18 @@ size_t sparse_vector< T, PageSize >::page::max_index() const {
 template < typename T, size_t PageSize >
 size_t sparse_vector< T, PageSize >::page::size() const {
   return m_size;
+}
+
+template < typename T, size_t PageSize >
+size_t sparse_vector< T, PageSize >::page::position( const size_t slot ) const noexcept {
+  assert( slot < m_size );
+  return m_back_index[ slot ];
+}
+
+template < typename T, size_t PageSize >
+const T& sparse_vector< T, PageSize >::page::value( const size_t slot ) const noexcept {
+  assert( slot < m_size );
+  return *reinterpret_cast< const T* >( m_data + slot );
 }
 
 template < typename T, size_t PageSize >

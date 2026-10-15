@@ -1,6 +1,6 @@
 #pragma once
 
-#include <functional>
+#include "selection.hpp"
 
 namespace ecs {
 
@@ -68,119 +68,48 @@ void components_storage::remove_entity_component( const eid_t id ) {
   storage.erase( id );
 }
 
-template < class Ft, class... Rs >
-void components_storage::join_impl( const eid_t id, Ft&& f, Rs&&... rs ) {
-  f( id, rs... );
+//=============================================================================
+//
+// Selection
+//
+// A set of component types is selected in two steps: pick the storage holding
+// the fewest elements, then walk its live elements and query the other storages
+// by id. Two consequences matter:
+//
+//   * the cost follows the number of candidate entities rather than the spread
+//     of their ids, so an id space that has grown wide - or been emptied out -
+//     no longer slows the walk down;
+//   * the storage walked is one of the required types, so no time is spent on
+//     entities that cannot match.
+//
+// The walk itself lives in selection.hpp, where the run-time choice of storage
+// is tied back to its compile-time type.
+//=============================================================================
+
+template < class... Cs >
+bool components_storage::exists_all( const eid_t id ) const {
+  bool result = true;
+
+  ( void ) std::initializer_list< int >{ ( result = result && [ & ] {
+    const auto storage = get_storage< Cs >();
+    return storage != nullptr && storage->exist( id );
+  }(), 0 )... };
+
+  return result;
 }
 
-template < class T, class... Ts, class Ft, class... Rs >
-void components_storage::join_impl( const eid_t id, Ft&& f, Rs&&... rs ) {
-  const auto storage = get_storage< T >();
-  if ( !storage || !storage->exist( id ) ) {
-    return;
-  }
-
-  join_impl < Ts... >( id, std::forward< Ft >( f ), std::forward< Rs >( rs )..., storage->get_unsafe( id ) );
-}
-
-template < typename... Ts, typename Ft >
+template < typename... Cs, typename Ft >
 void components_storage::join( Ft&& f ) {
-  eid_t min_index = 0;
-  eid_t max_index = 0;
-
-  if ( !get_index_range< Ts... >( min_index, max_index ) ) {
-    return;
-  }
-
-  for ( eid_t i = min_index; i <= max_index; ++i ) {
-    join_impl< Ts... >( i, std::forward< Ft >( f ) );
-  }
-}
-
-// Returns false when none of the requested components has a single element, in
-// which case there is nothing to iterate at all. The bounds are reported through
-// a bool rather than a sentinel value: index_range() works in size_t and its
-// "no index" marker does not survive the narrowing to eid_t.
-template < class T >
-bool components_storage::get_index_range( eid_t& min_index, eid_t& max_index ) {
-  const auto storage = get_storage< T >();
-  if ( !storage ) {
-    return false;
-  }
-
-  const auto range = storage->index_range();
-  if ( range.first == sparse_vector< T >::bad_index ) {
-    return false;
-  }
-
-  min_index = static_cast< eid_t >( range.first );
-  max_index = static_cast< eid_t >( range.second );
-  return true;
-}
-
-template < class T, class... Rs >
-typename std::enable_if< sizeof...( Rs ) != 0, bool >::type components_storage::get_index_range( eid_t& min_index, eid_t& max_index ) {
-  const auto storage = get_storage< T >();
-
-  if ( !storage ) {
-    return get_index_range< Rs... >( min_index, max_index );
-  }
-
-  const auto range = storage->index_range();
-  if ( range.first == sparse_vector< T >::bad_index ) {
-    return get_index_range< Rs... >( min_index, max_index );
-  }
-
-  min_index = static_cast< eid_t >( range.first );
-  max_index = static_cast< eid_t >( range.second );
-
-  eid_t other_min = 0;
-  eid_t other_max = 0;
-  if ( get_index_range< Rs... >( other_min, other_max ) ) {
-    min_index = min_index > other_min ? other_min : min_index;
-    max_index = max_index < other_max ? other_max : max_index;
-  }
-
-  return true;
+  // The components are already in hand for the walked storage, so they are passed
+  // through directly rather than looked up again.
+  detail::walk_required< components_storage, Cs... >( *this, [ & ]( const eid_t id, const Cs&... cs ) {
+    f( id, cs... );
+  } );
 }
 
 template < typename... Ts >
 components_storage::join_exclude_wrapper< Ts... > components_storage::join() {
   return components_storage::join_exclude_wrapper< Ts... >( *this );
-}
-
-template < typename... Ts >
-template < class Ft, class... Rs >
-void components_storage::join_exclude_wrapper< Ts... >::join_impl( const eid_t id, Ft&& f, Rs&&... rs ) {
-  f( id, rs... );
-}
-
-template < typename... Ts >
-template < class T, class... TsJoin, class Ft, class... Rs >
-void components_storage::join_exclude_wrapper< Ts... >::join_impl( const eid_t id, Ft&& f, Rs&&... rs ) {
-  const auto storage = m_storage.get_storage< T >();
-  if ( !storage || !storage->exist( id ) ) {
-    return;
-  }
-
-  join_impl < TsJoin... >( id, std::forward< Ft >( f ), std::forward< Rs >( rs )..., storage->get_unsafe( id ) );
-}
-
-template < typename... Ts >
-template < class Ft >
-void components_storage::join_exclude_wrapper< Ts... >::exclude_impl( const eid_t id, Ft&& f ) {
-  join_impl < Ts... >( id, std::forward< Ft >( f ) );
-}
-
-template < typename... Ts >
-template < class T, class... TsEx, class Ft >
-void components_storage::join_exclude_wrapper< Ts... >::exclude_impl( const eid_t id, Ft&& f ) {
-  const auto storage = m_storage.get_storage< T >();
-  if ( storage && storage->exist( id ) ) {
-    return;
-  }
-
-  exclude_impl < TsEx... >( id, std::forward< Ft >( f ) );
 }
 
 template < typename... Ts >
@@ -191,16 +120,16 @@ components_storage::join_exclude_wrapper< Ts... >::join_exclude_wrapper( compone
 template < typename... Ts >
 template < typename... TsEx, typename Ft >
 void components_storage::join_exclude_wrapper< Ts... >::exclude( Ft&& func ) {
-  eid_t min_index = 0;
-  eid_t max_index = 0;
+  // Candidates come from the joined components; each is then rejected if any of
+  // the excluded components is present. A component no entity carries rejects
+  // nothing, which falls out of the test instead of needing a special case.
+  detail::walk_required< components_storage, Ts... >( m_storage, [ & ]( const eid_t id, const Ts&... cs ) {
+    if ( m_storage.exists_all< TsEx... >( id ) ) {
+      return;
+    }
 
-  if ( !m_storage.get_index_range< Ts... >( min_index, max_index ) ) {
-    return;
-  }
-
-  for ( eid_t i = min_index; i <= max_index; ++i ) {
-    exclude_impl< TsEx... >( i, std::forward< Ft >( func ) );
-  }
+    func( id, cs... );
+  } );
 }
 
 }
